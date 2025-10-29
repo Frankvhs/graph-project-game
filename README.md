@@ -118,5 +118,5 @@ El juego está desarrollado con [**LibGDX**](https://libgdx.com/), un framework 
 
 ---
 
-> [!warn] 
+> [!warning] 
 > Asegúrate de tener Java JDK 17 o superior instalado y configurado correctamente en tu variable de entorno `JAVA_HOME` antes de ejecutar cualquier comando de Gradle.
