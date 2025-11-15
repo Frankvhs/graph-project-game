@@ -70,3 +70,9 @@ subprojects {
 }
 
 eclipse.project.name = 'Test test' + '-parent'
+
+java{
+  toolchain{
+    languageVersion = JavaLanguageVersion.of(22)
+  }
+}
