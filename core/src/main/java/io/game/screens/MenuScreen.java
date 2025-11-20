@@ -3,118 +3,99 @@ package io.game.screens;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.audio.Music;
+import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
-import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
-import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
+import io.game.objects.Button;
 
 public class MenuScreen implements Screen {
 
-    private Stage stage;
-
-    private Music menuMusic;
-
-    private Image titulo;
-    private Image fondo;
-
-    private ImageButton btnPlay;
-    private ImageButton btnLoadGame;
-    private ImageButton btnOptions;
-    private ImageButton btnExit;
+    private Stage stage;          
+    private Music menuMusic;      
+    private Sound buttonSound;    
+    private Image titulo;         
+    private Image fondo;          
 
     public MenuScreen(SpriteBatch batch) {
         stage = new Stage(new ScreenViewport(), batch);
-        Gdx.input.setInputProcessor(stage);
+        Gdx.input.setInputProcessor(stage); 
 
-        cargarFondo();
-        cargarTitulo();
-        cargarBotones();
-        cargarMusica();
+        cargarFondo();      
+        cargarTitulo();     
+        cargarSonido();     
+        cargarBotones();    
+        cargarMusica();     
     }
 
+    // Carga la imagen de fondo y la ajusta al tamaño de la pantalla
     private void cargarFondo() {
-        Texture fondoTexture = new Texture(Gdx.files.internal("graphics/menu/fondo_menu.png"));
+        Texture fondoTexture = new Texture(Gdx.files.internal("graphics/ui/menu/main/fondo_menu.png"));
         fondo = new Image(fondoTexture);
         fondo.setSize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
         stage.addActor(fondo);
     }
 
+    // Carga la imagen del título, escalándola proporcionalmente y centrada en la parte superior
     private void cargarTitulo() {
-        Texture tituloTexture = new Texture(Gdx.files.internal("graphics/menu/title.png"));
+        Texture tituloTexture = new Texture(Gdx.files.internal("graphics/ui/menu/main/title.png"));
         titulo = new Image(tituloTexture);
 
-        // Escalar proporcional al ancho de la pantalla
         float tituloWidth = Gdx.graphics.getWidth() * 0.6f;
         float aspectRatio = (float) tituloTexture.getHeight() / (float) tituloTexture.getWidth();
         float tituloHeight = tituloWidth * aspectRatio;
 
         titulo.setSize(tituloWidth, tituloHeight);
-
-        // Pegado al top y centrado horizontalmente
-        titulo.setPosition(
-                (Gdx.graphics.getWidth() - tituloWidth) / 2f,
-                Gdx.graphics.getHeight() - tituloHeight
-        );
+        titulo.setPosition((Gdx.graphics.getWidth() - tituloWidth) / 2f,
+                           Gdx.graphics.getHeight() - tituloHeight);
 
         stage.addActor(titulo);
     }
 
+    // Carga el sonido que se reproducirá al presionar cualquier botón
+    private void cargarSonido() {
+        buttonSound = Gdx.audio.newSound(Gdx.files.internal("audio/Fx/Sbottom.mp3"));
+    }
+
+    // Crea los botones usando la clase Button con sonido integrado y los agrega al stage
     private void cargarBotones() {
         float screenW = Gdx.graphics.getWidth();
         float screenH = Gdx.graphics.getHeight();
 
-        float buttonWidth = screenW * 0.3f;
-        float buttonHeight = screenH * 0.15f;
+        float buttonWidth = screenW * 0.28f;  // 20% del ancho de la pantalla
+        float buttonHeight = screenH * 0.17f; // 12% del alto de la pantalla
 
-        // Botones centrados verticalmente entre el título y el bottom
-        float yTop = titulo.getY() - 20;
+        float yTop = titulo.getY() - 20; // 20 píxeles debajo del título
         float yBottom = 20;
         int numButtons = 4;
         float spacing = (yTop - yBottom) / (numButtons + 1);
+        float centerX = (screenW - buttonWidth) / 2f; // Centrado horizontal
 
-        float centerX = (screenW - buttonWidth) / 2f;
+        // Crear los botones con acción y sonido
+        Button btnPlay = new Button("play", centerX, yTop - spacing, buttonWidth, buttonHeight,
+                                    "graphics/ui/menu/main/", () -> System.out.println("PLAY"), buttonSound);
 
-        btnPlay = crearBoton("play", centerX, yTop - spacing, buttonWidth, buttonHeight, () -> System.out.println("PLAY"));
-        btnLoadGame = crearBoton("loadgame", centerX, yTop - spacing * 2, buttonWidth, buttonHeight, () -> System.out.println("LOAD GAME"));
-        btnOptions = crearBoton("options", centerX, yTop - spacing * 3, buttonWidth, buttonHeight, () -> System.out.println("OPTIONS"));
-        btnExit = crearBoton("exit", centerX, yTop - spacing * 4, buttonWidth, buttonHeight, Gdx.app::exit);
+        Button btnLoadGame = new Button("loadgame", centerX, yTop - spacing * 2, buttonWidth, buttonHeight,
+                                        "graphics/ui/menu/main/", () -> System.out.println("LOAD GAME"), buttonSound);
 
-        stage.addActor(btnPlay);
-        stage.addActor(btnLoadGame);
-        stage.addActor(btnOptions);
-        stage.addActor(btnExit);
+        Button btnOptions = new Button("options", centerX, yTop - spacing * 3, buttonWidth, buttonHeight,
+                                       "graphics/ui/menu/main/", () -> System.out.println("OPTIONS"), buttonSound);
+
+        Button btnExit = new Button("exit", centerX, yTop - spacing * 4, buttonWidth, buttonHeight,
+                                    "graphics/ui/menu/main/", Gdx.app::exit, buttonSound);
+
+        // Agregar botones al stage
+        stage.addActor(btnPlay.getButton());
+        stage.addActor(btnLoadGame.getButton());
+        stage.addActor(btnOptions.getButton());
+        stage.addActor(btnExit.getButton());
     }
 
-    private ImageButton crearBoton(String name, float x, float y, float w, float h, Runnable accion) {
-        Texture normal = new Texture(Gdx.files.internal("graphics/menu/" + name + "_normal.png"));
-        Texture hover  = new Texture(Gdx.files.internal("graphics/menu/" + name + "_hover.png"));
-        Texture click  = new Texture(Gdx.files.internal("graphics/menu/" + name + "_click.png"));
-
-        ImageButton.ImageButtonStyle style = new ImageButton.ImageButtonStyle();
-        style.up = new TextureRegionDrawable(normal);
-        style.over = new TextureRegionDrawable(hover);
-        style.down = new TextureRegionDrawable(click);
-
-        ImageButton button = new ImageButton(style);
-        button.setSize(w, h);
-        button.setPosition(x, y);
-
-        button.addListener(new com.badlogic.gdx.scenes.scene2d.InputListener() {
-            @Override
-            public boolean touchDown(com.badlogic.gdx.scenes.scene2d.InputEvent event, float px, float py, int pointer, int button) {
-                accion.run();
-                return true;
-            }
-        });
-
-        return button;
-    }
-
+    // Carga y reproduce la música de fondo
     private void cargarMusica() {
-        menuMusic = Gdx.audio.newMusic(Gdx.files.internal("audio/S1.mp3"));
+        menuMusic = Gdx.audio.newMusic(Gdx.files.internal("audio/Music/S1.mp3"));
         menuMusic.setLooping(true);
         menuMusic.setVolume(0.5f);
         menuMusic.play();
@@ -122,14 +103,15 @@ public class MenuScreen implements Screen {
 
     @Override
     public void render(float delta) {
-        stage.act(delta);
-        stage.draw();
+        stage.act(delta);  
+        stage.draw();      
     }
 
     @Override
     public void dispose() {
-        stage.dispose();
+        stage.dispose();       
         if (menuMusic != null) menuMusic.dispose();
+        if (buttonSound != null) buttonSound.dispose();
     }
 
     @Override public void show() { Gdx.input.setInputProcessor(stage); }
