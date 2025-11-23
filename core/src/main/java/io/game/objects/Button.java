@@ -1,51 +1,66 @@
 package io.game.objects;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.audio.Sound;
+import com.badlogic.gdx.scenes.scene2d.InputEvent;
+import com.badlogic.gdx.scenes.scene2d.ui.ImageButton;
+import com.badlogic.gdx.scenes.scene2d.utils.TextureRegionDrawable;
 import com.badlogic.gdx.graphics.Texture;
-import com.badlogic.gdx.graphics.g2d.Sprite;
-import com.badlogic.gdx.graphics.g2d.SpriteBatch;
-import com.badlogic.gdx.math.Rectangle;
+import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 
 public class Button {
 
-    private Texture normal;
-    private Texture hover;
-    private Texture click;
+    private ImageButton button;  
+    private Texture normal;      
+    private Texture hover;       
+    private Texture click;       
+    private Sound clickSound;    
 
-    private Sprite sprite;
-    private Rectangle rect;
-
-    // Nuevo constructor con ruta base
-    public Button(String name, float x, float y, float w, float h, String basePath) {
+    /**
+     *
+     * @param name 
+     * @param x 
+     * @param y
+     * @param width 
+     * @param height
+     * @param basePath 
+     * @param accion 
+     * @param clickSound 
+     */
+    public Button(String name, float x, float y, float width, float height, String basePath, Runnable accion, Sound clickSound) {
+        // Cargar texturas del botón
         normal = new Texture(Gdx.files.internal(basePath + name + "_normal.png"));
         hover  = new Texture(Gdx.files.internal(basePath + name + "_hover.png"));
         click  = new Texture(Gdx.files.internal(basePath + name + "_click.png"));
 
-        sprite = new Sprite(normal);
-        sprite.setSize(w, h);
-        sprite.setPosition(x, y);
+        // Guardar el sonido del botón
+        this.clickSound = clickSound;
 
-        rect = new Rectangle(x, y, w, h);
+        // Crear estilo del ImageButton con las tres texturas
+        ImageButton.ImageButtonStyle style = new ImageButton.ImageButtonStyle();
+        style.up = new TextureRegionDrawable(normal);
+        style.over = new TextureRegionDrawable(hover);
+        style.down = new TextureRegionDrawable(click);
+
+        // Crear el ImageButton con el estilo
+        button = new ImageButton(style);
+        button.setSize(width, height);
+        button.setPosition(x, y);
+
+        // Agregar listener de click
+        button.addListener(new ClickListener() {
+            @Override
+            public void clicked(InputEvent event, float px, float py) {
+                if (Button.this.clickSound != null) {
+                    Button.this.clickSound.play();
+                }
+                accion.run();
+            }
+        });
     }
 
-    public void update(float mx, float my) {
-        if (rect.contains(mx, my)) {
-            sprite.setTexture(hover);
-        } else {
-            sprite.setTexture(normal);
-        }
-    }
-
-    public void click() {
-        sprite.setTexture(click);
-    }
-
-    public boolean isHover(float mx, float my) {
-        return rect.contains(mx, my);
-    }
-
-    public void draw(SpriteBatch batch) {
-        sprite.draw(batch);
+    public ImageButton getButton() {
+        return button;
     }
 
     public void dispose() {
