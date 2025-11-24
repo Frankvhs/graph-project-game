@@ -11,6 +11,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
+import io.game.GameMain;
 import io.game.managers.Resources;
 import io.game.ui.Button;
 
@@ -18,6 +19,7 @@ public class MenuScreen implements Screen {
 	public static final String BASE_PATH = "graphics/ui/menu/main";
 
 	private Stage stage;
+	private GameMain game;
 	private Music menuMusic;
 	private Sound buttonSound;
 
@@ -26,8 +28,9 @@ public class MenuScreen implements Screen {
 		return Resources.getTexture(name, BASE_PATH);
 	}
 
-	public MenuScreen(SpriteBatch batch) {
-		stage = new Stage(new ScreenViewport(), batch);
+	public MenuScreen(GameMain game) {
+		this.game = game;
+		stage = new Stage(new ScreenViewport(), game.batch);
 		Gdx.input.setInputProcessor(stage);
 
 		loadAssets();
@@ -81,8 +84,10 @@ public class MenuScreen implements Screen {
 		//
 		float buttonWidth = screenW * 0.28f;
 		float buttonHeight = screenH * 0.17f;
-		table.add(new Button("play", BASE_PATH, () -> System.out.println("PLAY"), buttonSound)).width(buttonWidth)
-				.height(buttonHeight).row();
+		table.add(new Button("play", BASE_PATH, () -> {
+			System.out.println("PLAY");
+			game.setScreen(game.gameScreen);
+		}, buttonSound)).width(buttonWidth).height(buttonHeight).row();
 
 		table.add(new Button("loadgame", BASE_PATH, () -> System.out.println("LOAD GAME"), buttonSound))
 				.width(buttonWidth).height(buttonHeight).row();

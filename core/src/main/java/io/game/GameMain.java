@@ -4,19 +4,22 @@ import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 
+import io.game.screens.GameScreen;
 import io.game.screens.MenuScreen;
 
-public class Main extends Game {
+public class GameMain extends Game {
 
-    private SpriteBatch batch;
-    private MenuScreen menuScreen;
+    public SpriteBatch batch;
+    public MenuScreen menuScreen;
+    public GameScreen gameScreen;
 
     @Override
     public void create() {
         batch = new SpriteBatch();
         
         // pantallas
-        menuScreen = new MenuScreen(batch);
+        menuScreen = new MenuScreen(this);
+        gameScreen = new GameScreen(batch);
         setScreen(menuScreen);
     }
 
