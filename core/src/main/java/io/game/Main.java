@@ -1,29 +1,33 @@
 package io.game;
 
-import com.badlogic.gdx.ApplicationAdapter;
+import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+
 import io.game.screens.MenuScreen;
 
-public class Main extends ApplicationAdapter {
+public class Main extends Game {
 
     private SpriteBatch batch;
-    private MenuScreen menu;
+    private MenuScreen menuScreen;
 
     @Override
     public void create() {
         batch = new SpriteBatch();
-        menu = new MenuScreen(batch);
+        
+        // pantallas
+        menuScreen = new MenuScreen(batch);
+        setScreen(menuScreen);
     }
 
     @Override
     public void render() {
-        menu.render(Gdx.graphics.getDeltaTime());
+        screen.render(Gdx.graphics.getDeltaTime());
     }
 
     @Override
     public void dispose() {
-        menu.dispose();
+        menuScreen.dispose();
         batch.dispose();
     }
 }
