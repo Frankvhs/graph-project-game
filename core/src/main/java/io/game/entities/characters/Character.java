@@ -9,7 +9,11 @@ public class Character extends AnimatedEntity {
     public CombatComponent combat;
     
     protected float maxSpeed;
-    protected boolean facingLeft = false;
+    
+    public Character() {
+    	super();
+    	anchor.set(0.5f, 0.9f);
+    }
     
     /**
      * - Girar a la izquierda o derecha segun movimiento
@@ -18,13 +22,9 @@ public class Character extends AnimatedEntity {
      */
     public void update(float dt) {
     	if (movement.x > 0) {
-    	    facingLeft = false;
+    	    flipLeft = false;
     	} else if (movement.x < 0) {
-    	    facingLeft = true;
-    	}
-    	
-    	if (frame.isFlipX() != facingLeft) {
-    	    frame.flip(true, false);
+    	    flipLeft = true;
     	}
     	
     	if (!movement.isZero()) {

@@ -40,6 +40,7 @@ public class AnimatedEntity extends Entity {
 	
 	public void setAnimationDuration(float animationDuration) {
 		this.animationDuration = animationDuration;
+		
 	}
 
 	public boolean isAnimationFinished() {

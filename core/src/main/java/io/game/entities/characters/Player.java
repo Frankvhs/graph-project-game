@@ -31,6 +31,7 @@ public class Player extends Character {
 	public Player() {
 		super();
 		size.set(100, 100);
+		position.set(0, 0);
 		maxSpeed = 400;
 		combat = new CombatComponent(100, 0.3f, 10);
 
@@ -53,10 +54,7 @@ public class Player extends Character {
 			movement.x -= maxSpeed;
 		if (right)
 			movement.x += maxSpeed;
-		
-		if ((movement.x + position.x) < 0 || (movement.x + position.x) > Gdx.graphics.getWidth()) movement.x = 0;
-		if ((movement.y + position.y) < 0 || (movement.y + position.y) > Gdx.graphics.getHeight()) movement.y = 0;
-
+	
 		boolean attack1 = Gdx.input.isKeyJustPressed(Input.Keys.SPACE);
 		boolean attack2 = Gdx.input.isKeyJustPressed(Input.Keys.CONTROL_LEFT);
 

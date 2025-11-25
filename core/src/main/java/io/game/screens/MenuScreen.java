@@ -6,6 +6,8 @@ import com.badlogic.gdx.audio.Music;
 import com.badlogic.gdx.audio.Sound;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.scenes.scene2d.Event;
+import com.badlogic.gdx.scenes.scene2d.EventListener;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.scenes.scene2d.ui.Image;
 import com.badlogic.gdx.scenes.scene2d.ui.Table;
@@ -22,6 +24,7 @@ public class MenuScreen implements Screen {
 	private GameMain game;
 	private Music menuMusic;
 	private Sound buttonSound;
+	private Image background;
 
 	// Utils
 	private Texture getTexture(String name) {
@@ -56,7 +59,7 @@ public class MenuScreen implements Screen {
 	}
 
 	private void createBackground() {
-		Image background = new Image(getTexture("fondo_menu"));
+		background = new Image(getTexture("fondo_menu"));
 		background.setSize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
 		stage.addActor(background);
 	}
@@ -134,6 +137,7 @@ public class MenuScreen implements Screen {
 
 	@Override
 	public void resize(int w, int h) {
+		background.setSize(w, h);
 		stage.getViewport().update(w, h, true);
 	}
 
