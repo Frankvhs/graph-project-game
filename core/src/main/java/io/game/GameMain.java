@@ -19,7 +19,8 @@ public class GameMain extends Game {
         
         // pantallas
         menuScreen = new MenuScreen(this);
-        gameScreen = new GameScreen(batch);
+        gameScreen = new GameScreen(this);
+        
         setScreen(menuScreen);
     }
 

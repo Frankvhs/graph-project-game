@@ -9,25 +9,26 @@ import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import io.game.managers.Resources;
 
 public class AnimatedEntity extends Entity {
-	private Animation<TextureRegion> animation;
+	protected Animation<TextureRegion> animation;
 	private float animationState = 0f;
+	private float animationDuration = 0;
 
-	public Animation<TextureRegion> play(Animation<TextureRegion> anim) {
+	public void play(Animation<TextureRegion> anim) {
 		if (anim != this.animation) {
 			this.animation = anim;
 			animationState = 0f;
+			animationDuration = anim.getAnimationDuration();
 		}
-		return anim;
 	}
-	public Animation<TextureRegion> play(String name, String basePath) {
-		return play(Resources.getAnimation(name, basePath));
+	public void play(String name, String basePath) {
+		play(Resources.getAnimation(name, basePath));
 	}
 
 	/**
 	 * Actualizar animación y mover la entidad segun su velocidad
 	 */
 	public void update(float delta) {
-		animationState += delta;
+		animationState += delta * animation.getAnimationDuration() / animationDuration;
 		this.frame = getFrame();
 
 		super.update(delta);
@@ -35,6 +36,10 @@ public class AnimatedEntity extends Entity {
 
 	public TextureRegion getFrame() {
 		return animation.getKeyFrame(animationState, true);
+	}
+	
+	public void setAnimationDuration(float animationDuration) {
+		this.animationDuration = animationDuration;
 	}
 
 	public boolean isAnimationFinished() {

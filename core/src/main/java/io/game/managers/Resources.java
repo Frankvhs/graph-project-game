@@ -8,6 +8,7 @@ import java.util.Queue;
 import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Animation;
+import com.badlogic.gdx.graphics.g2d.Animation.PlayMode;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.utils.Array;
 
@@ -46,7 +47,7 @@ public class Resources {
      * Carga una animación desde un archivo de textura, dividiéndola en frames automáticamente.
      */
     public static void loadAnimation(String path, float frameWidth, float frameHeight, float speed) {
-        loadAnimation(path, frameWidth, frameHeight, speed, 0, 0);
+        loadAnimation(path, frameWidth, frameHeight, speed, 0, 0, PlayMode.LOOP);
     }
 
     /**
@@ -54,11 +55,11 @@ public class Resources {
      * Encola la construcción de la animación para ser procesada al llamar a finish()
      */
     public static void loadAnimation(String path, float frameWidth, float frameHeight,
-                                     float speed, float padX, float padY) {
+                                     float speed, float padX, float padY, PlayMode playMode) {
 
         loadTexture(path);
         animationQueue.add(new AnimationJob(
-                path, frameWidth, frameHeight, speed, padX, padY
+                path, frameWidth, frameHeight, speed, padX, padY, playMode
         ));
     }
 
@@ -67,7 +68,7 @@ public class Resources {
      */
     public static void loadAnimation(String name, String basePath,
                                      float frameWidth, float frameHeight, float speed) {
-        loadAnimation(name, basePath, frameWidth, frameHeight, speed, 0, 0);
+        loadAnimation(name, basePath, frameWidth, frameHeight, speed, 0, 0, PlayMode.LOOP);
     }
 
     /**
@@ -75,9 +76,9 @@ public class Resources {
      */
     public static void loadAnimation(String name, String basePath,
                                      float frameWidth, float frameHeight,
-                                     float speed, float padX, float padY) {
+                                     float speed, float padX, float padY, PlayMode mode) {
 
-        loadAnimation(joinPath(name, basePath), frameWidth, frameHeight, speed, padX, padY);
+        loadAnimation(joinPath(name, basePath), frameWidth, frameHeight, speed, padX, padY, mode);
     }
 
     /**
@@ -113,7 +114,7 @@ public class Resources {
             }
         }
 
-        Animation<TextureRegion> animation = new Animation<>(job.speed, frames, Animation.PlayMode.LOOP);
+        Animation<TextureRegion> animation = new Animation<>(job.speed, frames, job.playMode);
         animations.put(job.path, animation);
     }
 
@@ -199,11 +200,13 @@ public class Resources {
         final float speed;
         final float padX;
         final float padY;
+        final PlayMode playMode;
 
         AnimationJob(String path, float frameWidth, float frameHeight,
-                     float speed, float padX, float padY) {
+                     float speed, float padX, float padY, PlayMode playMode) {
 
             this.path = path;
+            this.playMode = playMode;
             this.frameWidth = frameWidth;
             this.frameHeight = frameHeight;
             this.speed = speed;

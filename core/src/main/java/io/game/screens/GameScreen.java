@@ -6,15 +6,18 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.utils.ScreenUtils;
 
+import io.game.GameMain;
 import io.game.entities.characters.Player;
 
 public class GameScreen implements Screen {
 	private Stage stage = new Stage();
 	private SpriteBatch batch;
+	private GameMain game;
 	private Player player;
 	
-	public GameScreen(SpriteBatch batch) {
-		this.batch = batch;
+	public GameScreen(GameMain game) {
+		this.game = game;
+		this.batch = game.batch;
 		Player.loadTextures();
 		player = new Player();
 		

@@ -32,6 +32,7 @@ public class Character extends AnimatedEntity {
             movement.nor().scl(maxSpeed);
     	}
     	
+    	combat.update(dt);
     	super.update(dt);
     }
 }

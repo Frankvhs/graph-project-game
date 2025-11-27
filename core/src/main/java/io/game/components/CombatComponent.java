@@ -2,12 +2,9 @@ package io.game.components;
 
 public class CombatComponent {
     private int damage;
-    
     private float attackCooldown;
     private float cooldownTimer = 0f;
-
     private float attackRange;
-
     private boolean attacking = false;
 
     public CombatComponent(int baseDamage, float attackCooldown, float attackRange) {
@@ -19,6 +16,7 @@ public class CombatComponent {
     public void update(float delta) {
         if (cooldownTimer > 0)
             cooldownTimer -= delta;
+        else finishAttack();
     }
 
     public boolean tryAttack() {
@@ -44,6 +42,10 @@ public class CombatComponent {
 
     public float getAttackRange() {
         return attackRange;
+    }
+    
+    public float getCooldown() {
+    	return attackCooldown;
     }
 
     public float getCooldownPercent() {
