@@ -25,10 +25,13 @@ public class AnimatedEntity extends Entity {
 	 * Actualizar animación y mover la entidad segun su velocidad
 	 */
 	public void update(float delta) {
-		animationState += delta * animation.getAnimationDuration() / animationDuration;
-		this.frame = getFrame();
 
-		super.update(delta);
+        if (animation != null) {
+            animationState += delta * animation.getAnimationDuration() / Math.max(animationDuration, 0.0001f);
+            this.frame = getFrame();
+        }
+
+        super.update(delta);
 	}
 
 	public TextureRegion getFrame() {

@@ -86,7 +86,7 @@ public class MenuScreen implements Screen {
 		float buttonHeight = screenH * 0.17f;
 		table.add(new Button("play", BASE_PATH, () -> {
 			System.out.println("PLAY");
-			game.setScreen(game.gameScreen);
+			game.setScreen(game.gameScreen);	
 		}, buttonSound)).width(buttonWidth).height(buttonHeight).row();
 
 		table.add(new Button("loadgame", BASE_PATH, () -> System.out.println("LOAD GAME"), buttonSound))
@@ -101,14 +101,14 @@ public class MenuScreen implements Screen {
 	}
 
 	private void loadMusic() {
-		menuMusic = Gdx.audio.newMusic(Gdx.files.internal("audio/Music/S1.mp3"));
+		menuMusic = Gdx.audio.newMusic(Gdx.files.internal("audio/music/S1.mp3"));
 		menuMusic.setLooping(true);
 		menuMusic.setVolume(0.5f);
 		menuMusic.play();
 	}
 
 	private void loadSounds() {
-		buttonSound = Gdx.audio.newSound(Gdx.files.internal("audio/Fx/Sbottom.mp3"));
+		buttonSound = Gdx.audio.newSound(Gdx.files.internal("audio/sound/Sbottom.mp3"));
 	}
 
 	// SCREEN METHODS
@@ -148,5 +148,6 @@ public class MenuScreen implements Screen {
 
 	@Override
 	public void hide() {
+		if (menuMusic != null) menuMusic.stop();
 	}
 }
