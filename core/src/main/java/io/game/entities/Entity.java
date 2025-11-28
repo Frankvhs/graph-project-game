@@ -11,7 +11,7 @@ public class Entity {
 	final public Vector2 anchor = new Vector2();
 
 	protected float rotation = 0f;
-	protected TextureRegion frame = new TextureRegion();
+	protected TextureRegion frame = null;
 	protected boolean flipLeft = false;
 
 	public void setFrame(TextureRegion frame) {
@@ -27,6 +27,7 @@ public class Entity {
 	}
 
 	public void render(Batch batch) {
+		if(frame==null) return;
 		if (flipLeft) {
 			batch.draw(
 				frame, 
