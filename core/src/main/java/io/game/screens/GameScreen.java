@@ -14,6 +14,7 @@ import io.game.entities.characters.Player;
 import io.game.generator.DungeonGenerator;
 import io.game.maps.Room;
 import io.game.maps.DungeonGraph;
+import io.game.managers.Resources;
 import io.game.managers.RoomManager;
 
 import java.util.ArrayList;
@@ -54,8 +55,14 @@ public class GameScreen implements Screen {
 
         player.size.set(tileW / 7f, tileH / 7f);
 
+        // Load dungeon textures
+        Resources.loadTexture("background", "graphics/tilesets/dungeons_tilesets");
+        Resources.loadTexture("stairs", "graphics/tilesets/dungeons_tilesets");
+        Resources.finish();
+
         renderer = new DungeonRenderer(tileW, tileH);
 
+        // setup camera and viewport
         camera = new OrthographicCamera();
         viewport = new ScreenViewport(camera);
         viewport.update((int) screenW, (int) Gdx.graphics.getHeight(), true);
@@ -142,5 +149,10 @@ public class GameScreen implements Screen {
     @Override public void hide() {gameMusic.stop();}
     @Override public void pause() {}
     @Override public void resume() {}
-    @Override public void dispose() {}
+    @Override public void dispose() {
+        if (gameMusic != null) gameMusic.dispose();
+        if (renderer != null) renderer.dispose();
+        if (viewport != null) viewport = null;
+        if (camera != null) camera = null;
+    }
 }
