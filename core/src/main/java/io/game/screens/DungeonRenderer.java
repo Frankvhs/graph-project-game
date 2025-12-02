@@ -4,7 +4,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.Color;
-
+import io.game.managers.Resources;
 import io.game.maps.Room;
 
 public class DungeonRenderer {
@@ -16,14 +16,9 @@ public class DungeonRenderer {
     public DungeonRenderer(float tileW, float tileH) {
         this.tileW = tileW;
         this.tileH = tileH;
-
-        try {
-            bg = new Texture("graphics/tilesets/dungeons_tilesets/background.png");
-        } catch (Exception e) { bg = null; }
-
-        try {
-            stairsTex = new Texture("graphics/tilesets/dungeons_tilesets/stairs.png");
-        } catch (Exception e) { stairsTex = null; }
+        
+        bg = Resources.getTexture("background", "graphics/tilesets/dungeons_tilesets");
+        stairsTex = Resources.getTexture("stairs", "graphics/tilesets/dungeons_tilesets");
     }
 
     public void render(SpriteBatch batch, Iterable<Room> rooms) {
@@ -62,5 +57,9 @@ public class DungeonRenderer {
                 batch.draw(stairsTex, cx, cy, stairSize, stairSize);
             }
         }
+    }
+    public void dispose() {
+        bg = null;
+            stairsTex = null;
     }
 }

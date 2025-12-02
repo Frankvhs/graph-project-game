@@ -36,5 +36,7 @@ public class GameMain extends Game {
     public void dispose() {
         menuScreen.dispose();
         batch.dispose();
+        gameScreen.dispose();
+        Resources.dispose();
     }
 }
