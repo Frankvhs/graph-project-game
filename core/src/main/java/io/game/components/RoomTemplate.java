@@ -58,4 +58,34 @@ public enum RoomTemplate {
     public int doorCount() {
         return doors.size();
     }
+
+    public RoomTemplate withDoor(Direction d) {
+        EnumSet<Direction> newDoors = EnumSet.copyOf(this.doors);
+        newDoors.add(d);
+        
+        // Buscar plantilla exacta
+        for (RoomTemplate tpl : RoomTemplate.values()) {
+            if (tpl.doors.equals(newDoors)) return tpl;
+        }
+    
+        // Si no existe exacta, buscar el superset más pequeño (mínimo número de puertas)
+        RoomTemplate best = null;
+        int bestCount = Integer.MAX_VALUE;
+        for (RoomTemplate tpl : RoomTemplate.values()) {
+            if (tpl.doors.containsAll(newDoors)) {
+                int cnt = tpl.doors.size();
+                if (cnt < bestCount) {
+                    best = tpl;
+                    bestCount = cnt;
+                }
+            }
+        }
+        if (best != null) return best;
+    
+        // último recurso
+        return RoomTemplate.NESO;
+    }
+
+
+
 }

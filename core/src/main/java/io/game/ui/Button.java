@@ -13,7 +13,7 @@ public class Button extends ImageButton {
 			Sound clickSound) {
 		super(getDrawable(name, basePath));
 
-		addListener(new ClickListener() {
+			addListener(new ClickListener() {
 			@Override
 			public void clicked(InputEvent event, float px, float py) {
 				if (clickSound != null) {

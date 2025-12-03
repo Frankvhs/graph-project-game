@@ -6,14 +6,10 @@ import io.game.components.Direction;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import java.util.EnumMap;
 
-/**
- * Room ahora permite cambiar template (setTemplate) para poder añadir puertas
- * dinámicamente cuando el generador decide crear ciclos.
- */
 public class Room {
 
     public final int x, y;
-    private RoomTemplate template; // ya no final
+    private RoomTemplate template; 
 
     public boolean isStart = false;
     public boolean hasStairs = false;
@@ -28,7 +24,6 @@ public class Room {
         for (Direction d : Direction.values()) connected.put(d, false);
     }
 
-    /** Cambiar template (se usa para añadir puertas dinámicamente) */
     public void setTemplate(RoomTemplate tpl) {
         this.template = tpl;
     }
@@ -53,6 +48,24 @@ public class Room {
     public TextureRegion getRegion() {
         return template.getRegion();
     }
+
+    public void clearConnectionsExceptNothing() {
+        for (Direction d : Direction.values()) {
+            connected.put(d, false); // o como manejes tu sistema de conexiones
+        }
+    }
+
+    public Direction getSingleDirection() {
+        // Si ya es SINGLE, devuelve su única puerta
+        if (this.getTemplate().getDoors().size() == 1) {
+            return this.getTemplate().getDoors().iterator().next();
+        }
+        // Si tiene 0 puertas, devolver algo consistente (por ejemplo norte)
+        return Direction.N;
+    }
+
+
+
 
     public float centerRoomX() { return x + 0.5f; }
     public float centerRoomY() { return y + 0.5f; }

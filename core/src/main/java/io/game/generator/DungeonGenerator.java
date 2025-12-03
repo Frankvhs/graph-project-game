@@ -1,388 +1,400 @@
 package io.game.generator;
 
-import io.game.components.Direction;
 import io.game.components.RoomTemplate;
+import io.game.components.Direction;
 import io.game.maps.Room;
 import io.game.maps.DungeonConfig;
 import io.game.maps.DungeonGraph;
-
 import java.util.*;
-import java.util.stream.Collectors;
 
-/**
- * Generador adaptado a tu especificación:
- * - objetivo mínimo de habitaciones: 6 + (level-1)
- * - generación expansiva desde una start room
- * - al final, puertas "sueltas" se cierran: primero intentando colocar
- *   un SINGLE en la dirección; si no cabe, se crea un ciclo "forzando"
- *   la adición de la puerta en la habitación con la que colisiona.
- *
- * Devuelve lista de rooms a partir del grafo interno.
- */
 public class DungeonGenerator {
-
-    private final Random rnd = new Random();
-    private final LinkedList<DoorSlot> openDoors = new LinkedList<>();
-
-    private final DungeonGraph graph = new DungeonGraph();
-    private DungeonConfig config;
-
-    public DungeonGraph getGraph() { return graph; }
-
-    public List<Room> generate(int level) {
-        // limpiar
+    
+    private int currentLevel;
+    private DungeonGraph graph;
+    private Room startRoom;
+    private Random random;
+    
+    public DungeonGenerator(int initialLevel) {
+        this.currentLevel = initialLevel;
+        this.graph = new DungeonGraph();
+        this.random = new Random();
+    }
+    
+    /**
+     * Genera una nueva mazmorra para el nivel actual
+     */
+    public void generate() {
         graph.clear();
-        openDoors.clear();
-
-        config = DungeonConfig.forLevel(level);
-        int target = config.minRooms; // mínimo obligatorio (6,7,8...)
-
-        // ---- start room ----
-        RoomTemplate startTpl = RoomTemplate.N_SINGLE; // simplificamos: start north single
-        Room start = placeRoom(0, 0, startTpl);
-        start.isStart = true;
-
-        // ---- expand hasta target o hasta no poder ----
-        while (graph.getRooms().size() < target && !openDoors.isEmpty()) {
-            boolean anyPlaced = false;
-            int pass = openDoors.size();
-
-            for (int i = 0; i < pass; i++) {
-                DoorSlot slot = openDoors.pollFirst();
-                if (slot == null) break;
-
-                boolean placed = tryPlaceAtSlot(slot, level);
-                if (placed) anyPlaced = true;
-                else openDoors.addLast(slot); // reintentar luego
-
-                if (graph.getRooms().size() >= target) break;
-            }
-
-            if (!anyPlaced) break; // no se pudieron colocar más
-        }
-
-        // ---- cerrar puertas abiertas (cerrado o ciclos) ----
-        closeAllOpenDoorsWithCycles();
-
-        // ---- colocar escalera en una hoja (habitacion con 1 conexion) ----
-        Room leaf = findFarthestLeaf(start);
-        if (leaf != null) leaf.hasStairs = true;
-
-        // ---- asegurar conectividad (BFS simple) ----
-        ensureConnectivity(start);
-
-        return new ArrayList<>(graph.getRooms());
+        
+        // Obtener configuración para el nivel actual
+        DungeonConfig config = DungeonConfig.forLevel(currentLevel);
+        int targetRooms = config.minRooms; // 6, 7, 8, etc.
+        
+        // 1. Crear habitación inicial (siempre SINGLE)
+        createInitialRoom();
+        
+        // 2. Crear las habitaciones adicionales
+        createAdditionalRooms(targetRooms - 1); // -1 porque ya creamos la inicial
+        
+        // 3. Conectar las habitaciones entre sí
+        connectRooms();
+        
+        // 4. Cerrar puertas abiertas con SINGLEs
+        closeOpenDoorsWithSingles();
+        
+        // 5. Colocar escaleras en una habitación SINGLE (no la inicial)
+        placeStairsInSingleRoom();
     }
-
-    // ----------------------------
-    // placeRoom: añade room al grafo y encola sus puertas
-    // ----------------------------
-    private Room placeRoom(int x, int y, RoomTemplate tpl) {
-        Room r = new Room(x, y, tpl);
-        graph.addRoom(r);
-        for (Direction d : tpl.getDoors()) openDoors.addLast(new DoorSlot(r, d));
-        return r;
+    
+    /**
+     * Crear habitación inicial (siempre SINGLE)
+     */
+    private void createInitialRoom() {
+        Direction[] directions = {Direction.N, Direction.E, Direction.S, Direction.O};
+        Direction startDir = directions[random.nextInt(directions.length)];
+        
+        RoomTemplate startTemplate = getSingleTemplateForDirection(startDir);
+        startRoom = new Room(0, 0, startTemplate);
+        startRoom.isStart = true;
+        graph.addRoom(startRoom);
     }
-
-    // ----------------------------
-    // tryPlaceAtSlot: intenta colocar una room compatible en el slot
-    // ----------------------------
-    private boolean tryPlaceAtSlot(DoorSlot slot, int level) {
-        Room src = slot.room;
-        Direction d = slot.dir;
-        int nx = src.x + d.dx;
-        int ny = src.y + d.dy;
-
-        Room existing = graph.getRoom(nx, ny);
-        if (existing != null) {
-            // si la existente tiene la puerta opuesta conectada, unir ambas
-            if (existing.hasDoor(d.opposite())) {
-                src.connect(d);
-                existing.connect(d.opposite());
-                graph.connect(src, existing, d);
-                removeOpenDoor(src, d);
-                removeOpenDoor(existing, d.opposite());
-                return true;
-            }
-            return false;
-        }
-
-        // candidatos que incluyen puerta opuesta
-        List<RoomTemplate> candidates = Arrays.stream(RoomTemplate.values())
-                .filter(t -> t.hasDoor(d.opposite()))
-                .collect(Collectors.toList());
-
-        Collections.shuffle(candidates, rnd);
-
-        for (RoomTemplate tpl : candidates) {
-            if (canPlaceTemplateAt(nx, ny, tpl)) {
-                Room newRoom = placeRoom(nx, ny, tpl);
-                src.connect(d);
-                newRoom.connect(d.opposite());
-                graph.connect(src, newRoom, d);
-                removeOpenDoor(src, d);
-                autoConnectNeighbors(newRoom);
-                return true;
-            }
-        }
-        return false;
-    }
-
-    // ----------------------------
-    // Comprueba si tpl es compatible en (x,y) con vecinos ya existentes
-    // ----------------------------
-    private boolean canPlaceTemplateAt(int x, int y, RoomTemplate tpl) {
-        for (Direction d : Direction.values()) {
-            Room n = graph.getRoom(x + d.dx, y + d.dy);
-            if (n != null) {
-                boolean tplHas = tpl.hasDoor(d);
-                boolean nHas = n.hasDoor(d.opposite());
-                if (tplHas != nHas) return false;
-            }
-        }
-        return true;
-    }
-
-    // ----------------------------
-    // autoConnectNeighbors: si el nuevo cuarto tiene vecinos compatibles, conecta
-    // ----------------------------
-    private void autoConnectNeighbors(Room r) {
-        int x = r.x, y = r.y;
-        for (Direction d : Direction.values()) {
-            Room n = graph.getRoom(x + d.dx, y + d.dy);
-            if (n != null && r.hasDoor(d) && n.hasDoor(d.opposite())) {
-                r.connect(d);
-                n.connect(d.opposite());
-                graph.connect(r, n, d);
-                removeOpenDoor(r, d);
-                removeOpenDoor(n, d.opposite());
-            }
-        }
-    }
-
-    private void removeOpenDoor(Room r, Direction d) {
-        Iterator<DoorSlot> it = openDoors.iterator();
-        while (it.hasNext()) {
-            DoorSlot s = it.next();
-            if (s.room == r && s.dir == d) {
-                it.remove();
-                return;
-            }
-        }
-    }
-
-    // ----------------------------
-    // closeAllOpenDoorsWithCycles:
-    //   - intenta colocar SINGLE en dirección abierta
-    //   - si no cabe (colisión), busca una room en esa dirección y
-    //     * añade la puerta necesaria en esa room (modificando su template) y
-    //     * crea la conexión (ciclo)
-    // ----------------------------
-    private void closeAllOpenDoorsWithCycles() {
-        while (!openDoors.isEmpty()) {
-            DoorSlot slot = openDoors.pollFirst();
-            if (slot == null) break;
-
-            Room r = slot.room;
-            Direction d = slot.dir;
-
-            int nx = r.x + d.dx;
-            int ny = r.y + d.dy;
-
-            // si ya hay room, conecta si es posible
-            Room neighbor = graph.getRoom(nx, ny);
-            if (neighbor != null) {
-                if (neighbor.hasDoor(d.opposite())) {
-                    r.connect(d);
-                    neighbor.connect(d.opposite());
-                    graph.connect(r, neighbor, d);
-                    removeOpenDoor(r, d);
-                    removeOpenDoor(neighbor, d.opposite());
-                    continue;
-                } else {
-                    // el vecino existe pero no tiene la puerta -> forzamos añadirla
-                    addDoorToRoomAndConnect(neighbor, d.opposite(), r);
-                    continue;
+    
+    /**
+     * Crear habitaciones adicionales
+     */
+    private void createAdditionalRooms(int count) {
+        // Posiciones ya ocupadas
+        Set<String> occupiedPositions = new HashSet<>();
+        occupiedPositions.add("0,0"); // La posición inicial
+        
+        // Crear las habitaciones en posiciones aleatorias cercanas
+        for (int i = 0; i < count; i++) {
+            int attempts = 0;
+            boolean placed = false;
+            
+            while (!placed && attempts < 100) {
+                attempts++;
+                
+                // Elegir una habitación existente aleatoria
+                List<Room> existingRooms = new ArrayList<>(graph.getRooms());
+                Room baseRoom = existingRooms.get(random.nextInt(existingRooms.size()));
+                
+                // Elegir una dirección aleatoria
+                Direction[] directions = Direction.values();
+                Direction dir = directions[random.nextInt(directions.length)];
+                
+                // Calcular nueva posición
+                int newX = baseRoom.x + dir.dx;
+                int newY = baseRoom.y + dir.dy;
+                
+                // Verificar que no esté ocupada
+                String posKey = newX + "," + newY;
+                if (!occupiedPositions.contains(posKey)) {
+                    // Crear una plantilla aleatoria (no SINGLE)
+                    RoomTemplate template = createRandomNonSingleTemplate();
+                    Room newRoom = new Room(newX, newY, template);
+                    
+                    // Añadir al grafo
+                    graph.addRoom(newRoom);
+                    occupiedPositions.add(posKey);
+                    placed = true;
                 }
             }
-
-            // intentamos colocar SINGLE directamente
-            RoomTemplate closeTpl = RoomTemplate.valueOf(d.opposite().name() + "_SINGLE");
-
-            if (canPlaceTemplateAt(nx, ny, closeTpl)) {
-                Room end = placeRoom(nx, ny, closeTpl);
-                end.connect(d.opposite());
-                r.connect(d);
-                graph.connect(r, end, d);
-                removeOpenDoor(end, d.opposite());
-                continue;
-            }
-
-            // si no cabe SINGLE (no espacio), buscamos una room en línea para formar ciclo
-            Room found = findRoomInDirection(nx, ny, d);
-            if (found != null) {
-                // found está en la línea hacia d; conectar r <-> found creando puerta en found
-                addDoorToRoomAndConnect(found, oppositeDirectionFrom(found, r), r);
-            } else {
-                // fallback: si no se encontró nada, intentamos buscar ANY nearby room y forzamos conexión
-                Room any = findAnyNearbyRoom(nx, ny);
-                if (any != null) {
-                    addDoorToRoomAndConnect(any, oppositeDirectionFrom(any, r), r);
-                }
+            
+            // Si no se pudo colocar después de muchos intentos, usar una posición aleatoria
+            if (!placed) {
+                int x, y;
+                String posKey;
+                do {
+                    x = random.nextInt(10) - 5; // Entre -5 y 5
+                    y = random.nextInt(10) - 5;
+                    posKey = x + "," + y;
+                } while (occupiedPositions.contains(posKey));
+                
+                RoomTemplate template = createRandomNonSingleTemplate();
+                Room newRoom = new Room(x, y, template);
+                graph.addRoom(newRoom);
+                occupiedPositions.add(posKey);
             }
         }
     }
-
-    // ----------------------------
-    // Añade la puerta 'dir' a 'target' modificando su template
-    // y conecta target <-> source en ese dir (dir es la dirección desde target hacia source)
-    // ----------------------------
-    private void addDoorToRoomAndConnect(Room target, Direction dir, Room source) {
-        // crear nuevo Door set = union entre target.template.getDoors() y dir
-        Set<Direction> union = new HashSet<>(target.getTemplate().getDoors());
-        union.add(dir);
-
-        // buscar RoomTemplate que tenga exactamente ese conjunto
-        RoomTemplate newTpl = findTemplateWithDoors(union);
-        if (newTpl != null) {
-            target.setTemplate(newTpl);
-        } else {
-            // si no se encuentra (no debería pasar con tu enum), usamos NESO (all doors) como fallback
-            target.setTemplate(RoomTemplate.NESO);
-        }
-
-        // conectar lógicamente y en grafo
-        target.connect(dir);
-        source.connect(dir.opposite());
-        graph.connect(target, source, dir);
-        // eliminar posibles open doors redundantes
-        removeOpenDoor(target, dir);
-        removeOpenDoor(source, dir.opposite());
-    }
-
-    // ----------------------------
-    // findTemplateWithDoors: busca enum cuya getDoors() == set
-    // ----------------------------
-    private RoomTemplate findTemplateWithDoors(Set<Direction> doors) {
-        EnumSet<Direction> check = EnumSet.noneOf(Direction.class);
-        check.addAll(doors);
-        for (RoomTemplate tpl : RoomTemplate.values()) {
-            if (tpl.getDoors().equals(check)) return tpl;
-        }
-        return null;
-    }
-
-    // ----------------------------
-    // Busca la primera room existente en la misma línea (en dirección d)
-    // empezando desde (nx,ny) y yendo en pasos de 1 celda.
-    // ----------------------------
-    private Room findRoomInDirection(int nx, int ny, Direction d) {
-        int step = 1;
-        while (step < 50) { // límite razonable para no infinite loop
-            Room r = graph.getRoom(nx + d.dx * (step - 1), ny + d.dy * (step - 1));
-            if (r != null) return r;
-            step++;
-        }
-        return null;
-    }
-
-    // ----------------------------
-    // fallback: busca cualquier room cercana (radio pequeño)
-    // ----------------------------
-    private Room findAnyNearbyRoom(int x, int y) {
-        for (int dx = -4; dx <= 4; dx++) {
-            for (int dy = -4; dy <= 4; dy++) {
-                Room r = graph.getRoom(x + dx, y + dy);
-                if (r != null) return r;
-            }
-        }
-        return null;
-    }
-
-    // ----------------------------
-    // Calcula la dirección desde 'near' hacia 'fromRoom' (útil para conectar)
-    // ----------------------------
-    private Direction oppositeDirectionFrom(Room near, Room fromRoom) {
-        int dx = fromRoom.x - near.x;
-        int dy = fromRoom.y - near.y;
-        if (dx == 1 && dy == 0) return Direction.E;
-        if (dx == -1 && dy == 0) return Direction.O;
-        if (dx == 0 && dy == 1) return Direction.N;
-        if (dx == 0 && dy == -1) return Direction.S;
-        // fallback: si no está exactamente alineada, escoger una dirección aproximada
-        if (Math.abs(dx) >= Math.abs(dy)) return dx > 0 ? Direction.E : Direction.O;
-        return dy > 0 ? Direction.N : Direction.S;
-    }
-
-    // ----------------------------
-    // findFarthestLeaf: hoja más lejana desde start (hoja = conexiones == 1)
-    // ----------------------------
-    private Room findFarthestLeaf(Room start) {
-        Collection<Room> all = graph.getRooms();
-        if (all.isEmpty()) return start;
-
-        Queue<Room> q = new LinkedList<>();
-        Map<Room, Integer> dist = new HashMap<>();
-        q.add(start);
-        dist.put(start, 0);
-
-        while (!q.isEmpty()) {
-            Room r = q.poll();
-            int d0 = dist.get(r);
+    
+    /**
+     * Conectar las habitaciones entre sí
+     */
+    private void connectRooms() {
+        List<Room> rooms = new ArrayList<>(graph.getRooms());
+        
+        // Para cada habitación, intentar conectar con vecinos
+        for (Room room : rooms) {
+            // Verificar las 4 direcciones
             for (Direction dir : Direction.values()) {
-                if (r.isConnected(dir)) {
-                    Room n = graph.getRoom(r.x + dir.dx, r.y + dir.dy);
-                    if (n != null && !dist.containsKey(n)) {
-                        dist.put(n, d0 + 1);
-                        q.add(n);
-                    }
-                }
-            }
-        }
-
-        int max = -1;
-        List<Room> best = new ArrayList<>();
-        for (Room r : all) {
-            int connections = 0;
-            for (Direction d : Direction.values()) if (r.isConnected(d)) connections++;
-            if (connections == 1) {
-                Integer dists = dist.get(r);
-                if (dists == null) continue;
-                if (dists > max) { max = dists; best.clear(); best.add(r); }
-                else if (dists == max) best.add(r);
-            }
-        }
-
-        if (!best.isEmpty()) return best.get(rnd.nextInt(best.size()));
-
-        // fallback: choose farthest in dist map
-        Room far = start;
-        for (Map.Entry<Room, Integer> e : dist.entrySet()) {
-            if (dist.get(far) == null || e.getValue() > dist.get(far)) far = e.getKey();
-        }
-        return far;
-    }
-
-    private void ensureConnectivity(Room start) {
-        Queue<Room> q = new LinkedList<>();
-        Set<Room> seen = new HashSet<>();
-
-        q.add(start);
-        seen.add(start);
-        while (!q.isEmpty()) {
-            Room r = q.poll();
-            for (Direction d : Direction.values()) {
-                if (r.isConnected(d)) {
-                    Room n = graph.getRoom(r.x + d.dx, r.y + d.dy);
-                    if (n != null && seen.add(n)) q.add(n);
+                int neighborX = room.x + dir.dx;
+                int neighborY = room.y + dir.dy;
+                
+                Room neighbor = graph.getRoom(neighborX, neighborY);
+                if (neighbor != null) {
+                    // Hay un vecino, conectar si es posible
+                    connectTwoRooms(room, neighbor, dir);
                 }
             }
         }
     }
-
-    private static class DoorSlot {
-        final Room room;
-        final Direction dir;
-        DoorSlot(Room r, Direction d) { this.room = r; this.dir = d; }
+    
+    /**
+     * Conectar dos habitaciones
+     */
+    private void connectTwoRooms(Room room1, Room room2, Direction dirFrom1To2) {
+        Direction dirFrom2To1 = dirFrom1To2.opposite();
+        
+        // Asegurar que ambas habitaciones tengan las puertas necesarias
+        ensureRoomHasDoor(room1, dirFrom1To2);
+        ensureRoomHasDoor(room2, dirFrom2To1);
+        
+        // Conectar en el grafo
+        graph.connect(room1, room2, dirFrom1To2);
+        
+        // Marcar como conectadas
+        room1.connect(dirFrom1To2);
+        room2.connect(dirFrom2To1);
+    }
+    
+    /**
+     * Asegurar que una habitación tenga una puerta en una dirección
+     */
+    private void ensureRoomHasDoor(Room room, Direction dir) {
+        if (!room.getTemplate().hasDoor(dir)) {
+            RoomTemplate newTemplate = room.getTemplate().withDoor(dir);
+            room.setTemplate(newTemplate);
+        }
+    }
+    
+    /**
+     * Cerrar puertas abiertas con habitaciones SINGLE
+     */
+    private void closeOpenDoorsWithSingles() {
+        List<Room> rooms = new ArrayList<>(graph.getRooms());
+        
+        for (Room room : rooms) {
+            // Para cada puerta que tenga la habitación
+            for (Direction dir : room.getTemplate().getDoors()) {
+                // Si no está conectada, cerrarla
+                if (!room.isConnected(dir)) {
+                    closeDoorWithSingle(room, dir);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Cerrar una puerta con una habitación SINGLE
+     */
+    private void closeDoorWithSingle(Room source, Direction dir) {
+        int targetX = source.x + dir.dx;
+        int targetY = source.y + dir.dy;
+        
+        // Verificar si ya hay una habitación en esa posición
+        Room existing = graph.getRoom(targetX, targetY);
+        
+        if (existing != null) {
+            // Ya hay una habitación, intentar conectarla
+            tryConnectExistingRoom(source, dir, existing);
+        } else {
+            // Crear una nueva habitación SINGLE
+            createSingleRoomToClose(source, dir, targetX, targetY);
+        }
+    }
+    
+    /**
+     * Intentar conectar con una habitación existente
+     */
+    private void tryConnectExistingRoom(Room source, Direction dir, Room target) {
+        Direction opposite = dir.opposite();
+        
+        // Si el objetivo ya tiene la puerta opuesta, conectar
+        if (target.hasDoor(opposite)) {
+            connectTwoRooms(source, target, dir);
+        } else {
+            // Intentar añadir la puerta al objetivo
+            tryAddDoorToRoom(target, opposite);
+            
+            // Si ahora tiene la puerta, conectar
+            if (target.hasDoor(opposite)) {
+                connectTwoRooms(source, target, dir);
+            } else {
+                // No se pudo añadir la puerta, quitar la puerta de la fuente
+                removeDoorFromRoom(source, dir);
+            }
+        }
+    }
+    
+    /**
+     * Intentar añadir una puerta a una habitación
+     */
+    private void tryAddDoorToRoom(Room room, Direction dir) {
+        RoomTemplate newTemplate = room.getTemplate().withDoor(dir);
+        room.setTemplate(newTemplate);
+    }
+    
+    /**
+     * Quitar una puerta de una habitación
+     */
+    private void removeDoorFromRoom(Room room, Direction dir) {
+        Set<Direction> doors = new HashSet<>(room.getTemplate().getDoors());
+        doors.remove(dir);
+        
+        // Buscar una plantilla que se ajuste
+        RoomTemplate newTemplate = findTemplateWithDoors(doors);
+        room.setTemplate(newTemplate);
+    }
+    
+    /**
+     * Crear una habitación SINGLE para cerrar una puerta
+     */
+    private void createSingleRoomToClose(Room source, Direction dir, int x, int y) {
+        RoomTemplate singleTemplate = getSingleTemplateForDirection(dir.opposite());
+        Room closingRoom = new Room(x, y, singleTemplate);
+        
+        // Añadir al grafo
+        graph.addRoom(closingRoom);
+        
+        // Conectar
+        connectTwoRooms(source, closingRoom, dir);
+    }
+    
+    /**
+     * Colocar escaleras en una habitación SINGLE (no la inicial)
+     */
+    private void placeStairsInSingleRoom() {
+        List<Room> singleRooms = new ArrayList<>();
+        
+        // Buscar habitaciones SINGLE
+        for (Room room : graph.getRooms()) {
+            if (room != startRoom && room.getTemplate().doorCount() == 1) {
+                singleRooms.add(room);
+            }
+        }
+        
+        // Si hay SINGLEs, elegir una aleatoria
+        if (!singleRooms.isEmpty()) {
+            Room stairsRoom = singleRooms.get(random.nextInt(singleRooms.size()));
+            stairsRoom.hasStairs = true;
+        } else {
+            // Si no hay, buscar la habitación más lejana
+            Room farthest = findFarthestRoom();
+            if (farthest != null) {
+                farthest.hasStairs = true;
+            }
+        }
+    }
+    
+    /**
+     * Encuentra la habitación más lejana de la inicial
+     */
+    private Room findFarthestRoom() {
+        Room farthest = null;
+        double maxDistance = 0;
+        
+        for (Room room : graph.getRooms()) {
+            if (room == startRoom) continue;
+            
+            double distance = Math.sqrt(
+                Math.pow(room.x - startRoom.x, 2) + 
+                Math.pow(room.y - startRoom.y, 2)
+            );
+            
+            if (distance > maxDistance) {
+                maxDistance = distance;
+                farthest = room;
+            }
+        }
+        
+        return farthest;
+    }
+    
+    /**
+     * Obtener plantilla SINGLE para una dirección
+     */
+    private RoomTemplate getSingleTemplateForDirection(Direction dir) {
+        switch (dir) {
+            case N: return RoomTemplate.N_SINGLE;
+            case E: return RoomTemplate.E_SINGLE;
+            case S: return RoomTemplate.S_SINGLE;
+            case O: return RoomTemplate.O_SINGLE;
+            default: return RoomTemplate.N_SINGLE;
+        }
+    }
+    
+    /**
+     * Crear una plantilla aleatoria que NO sea SINGLE
+     */
+    private RoomTemplate createRandomNonSingleTemplate() {
+        List<RoomTemplate> nonSingleTemplates = new ArrayList<>();
+        
+        for (RoomTemplate template : RoomTemplate.values()) {
+            if (template.doorCount() > 1) {
+                nonSingleTemplates.add(template);
+            }
+        }
+        
+        if (nonSingleTemplates.isEmpty()) {
+            return RoomTemplate.NESO; // Fallback
+        }
+        
+        return nonSingleTemplates.get(random.nextInt(nonSingleTemplates.size()));
+    }
+    
+    /**
+     * Encontrar plantilla con un conjunto específico de puertas
+     */
+    private RoomTemplate findTemplateWithDoors(Set<Direction> doors) {
+        // Buscar coincidencia exacta
+        for (RoomTemplate template : RoomTemplate.values()) {
+            if (template.getDoors().equals(doors)) {
+                return template;
+            }
+        }
+        
+        // Buscar superset más pequeño
+        RoomTemplate best = null;
+        int bestCount = Integer.MAX_VALUE;
+        
+        for (RoomTemplate template : RoomTemplate.values()) {
+            if (template.getDoors().containsAll(doors)) {
+                int count = template.doorCount();
+                if (count < bestCount) {
+                    bestCount = count;
+                    best = template;
+                }
+            }
+        }
+        
+        return best != null ? best : RoomTemplate.NESO;
+    }
+    
+    /**
+     * Cuando el jugador encuentra las escaleras
+     */
+    public void onStairsFound() {
+        currentLevel++;
+        generate();
+    }
+    
+    // Métodos de acceso
+    
+    public DungeonGraph getGraph() {
+        return graph;
+    }
+    
+    public Room getStartRoom() {
+        return startRoom;
+    }
+    
+    public int getCurrentLevel() {
+        return currentLevel;
+    }
+    
+    public Collection<Room> getRooms() {
+        return graph.getRooms();
     }
 }
