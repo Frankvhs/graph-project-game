@@ -38,31 +38,70 @@ public class DungeonGenerator {
         int target = config.minRooms; // mínimo obligatorio (6,7,8...)
 
         // ---- start room ----
-        RoomTemplate startTpl = RoomTemplate.N_SINGLE; // simplificamos: start north single
+        // Usar una habitación con múltiples puertas para mejor expansión
+        RoomTemplate startTpl = RoomTemplate.NESO; // 4 puertas para máxima expansión
         Room start = placeRoom(0, 0, startTpl);
         start.isStart = true;
 
         // ---- expand hasta target o hasta no poder ----
-        while (graph.getRooms().size() < target && !openDoors.isEmpty()) {
+        int maxAttempts = target * 10; // más intentos para asegurar expansión
+        int attempts = 0;
+        int stuckCounter = 0; // contador de pasadas sin progreso
+        
+        while (graph.getRooms().size() < target && !openDoors.isEmpty() && attempts < maxAttempts) {
             boolean anyPlaced = false;
             int pass = openDoors.size();
 
-            for (int i = 0; i < pass; i++) {
+            for (int i = 0; i < pass && graph.getRooms().size() < target; i++) {
                 DoorSlot slot = openDoors.pollFirst();
                 if (slot == null) break;
 
                 boolean placed = tryPlaceAtSlot(slot, level);
-                if (placed) anyPlaced = true;
-                else openDoors.addLast(slot); // reintentar luego
-
-                if (graph.getRooms().size() >= target) break;
+                if (placed) {
+                    anyPlaced = true;
+                    stuckCounter = 0; // reset al tener éxito
+                } else {
+                    openDoors.addLast(slot); // reintentar luego
+                }
+                
+                attempts++;
             }
 
-            if (!anyPlaced) break; // no se pudieron colocar más
+            if (!anyPlaced) {
+                stuckCounter++;
+                // Si llevamos 3 pasadas sin colocar nada y aún no llegamos al mínimo, 
+                // intentar forzar colocación en posiciones aleatorias
+                if (stuckCounter >= 3 && graph.getRooms().size() < target) {
+                    boolean forced = tryForceRandomRoom();
+                    if (forced) {
+                        stuckCounter = 0;
+                        anyPlaced = true;
+                    } else {
+                        break; // definitivamente no podemos expandir más
+                    }
+                } else if (stuckCounter >= 5) {
+                    break; // demasiados intentos fallidos
+                }
+            }
         }
 
         // ---- cerrar puertas abiertas (cerrado o ciclos) ----
         closeAllOpenDoorsWithCycles();
+        
+        // ---- validación final: eliminar todas las puertas no conectadas ----
+        validateAndFixAllRooms();
+        
+        // ---- segunda pasada de validación para asegurar ----
+        // Esto es crítico: revisar nuevamente después de todos los cambios
+        for (Room room : graph.getRooms()) {
+            Set<Direction> templateDoors = new HashSet<>(room.getTemplate().getDoors());
+            for (Direction d : templateDoors) {
+                if (!room.isConnected(d)) {
+                    // Esta puerta no está conectada, eliminarla
+                    removeDoorFromRoom(room, d);
+                }
+            }
+        }
 
         // ---- colocar escalera en una hoja (habitacion con 1 conexion) ----
         Room leaf = findFarthestLeaf(start);
@@ -78,10 +117,76 @@ public class DungeonGenerator {
     // placeRoom: añade room al grafo y encola sus puertas
     // ----------------------------
     private Room placeRoom(int x, int y, RoomTemplate tpl) {
+        return placeRoom(x, y, tpl, true);
+    }
+    
+    private Room placeRoom(int x, int y, RoomTemplate tpl, boolean addDoorsToQueue) {
         Room r = new Room(x, y, tpl);
         graph.addRoom(r);
-        for (Direction d : tpl.getDoors()) openDoors.addLast(new DoorSlot(r, d));
+        if (addDoorsToQueue) {
+            for (Direction d : tpl.getDoors()) openDoors.addLast(new DoorSlot(r, d));
+        }
         return r;
+    }
+    
+    // ----------------------------
+    // tryForceRandomRoom: intenta forzar colocación de una habitación en posición aleatoria
+    // para superar bloqueos cuando el algoritmo normal falla
+    // ----------------------------
+    private boolean tryForceRandomRoom() {
+        // Obtener todas las habitaciones existentes
+        List<Room> rooms = new ArrayList<>(graph.getRooms());
+        if (rooms.isEmpty()) return false;
+        
+        // Intentar desde habitaciones aleatorias
+        Collections.shuffle(rooms, rnd);
+        
+        for (Room room : rooms) {
+            // Intentar en todas las direcciones
+            Direction[] dirs = Direction.values();
+            List<Direction> shuffledDirs = Arrays.asList(dirs);
+            Collections.shuffle(shuffledDirs, rnd);
+            
+            for (Direction d : shuffledDirs) {
+                int nx = room.x + d.dx;
+                int ny = room.y + d.dy;
+                
+                // Verificar que no haya habitación ahí
+                if (graph.getRoom(nx, ny) != null) continue;
+                
+                // Intentar colocar una habitación simple con puerta opuesta
+                RoomTemplate simpleTpl = null;
+                try {
+                    simpleTpl = RoomTemplate.valueOf(d.opposite().name() + "_SINGLE");
+                } catch (IllegalArgumentException e) {
+                    continue;
+                }
+                
+                if (canPlaceTemplateAt(nx, ny, simpleTpl)) {
+                    // Añadir puerta a la habitación origen si no la tiene
+                    if (!room.hasDoor(d)) {
+                        Set<Direction> newDoors = new HashSet<>(room.getTemplate().getDoors());
+                        newDoors.add(d);
+                        RoomTemplate newTpl = findTemplateWithDoors(newDoors);
+                        if (newTpl != null) {
+                            room.setTemplate(newTpl);
+                        } else {
+                            room.setTemplate(RoomTemplate.NESO); // fallback con todas las puertas
+                        }
+                    }
+                    
+                    // Colocar nueva habitación
+                    Room newRoom = placeRoom(nx, ny, simpleTpl);
+                    room.connect(d);
+                    newRoom.connect(d.opposite());
+                    graph.connect(room, newRoom, d);
+                    removeOpenDoor(room, d);
+                    return true;
+                }
+            }
+        }
+        
+        return false;
     }
 
     // ----------------------------
@@ -179,12 +284,17 @@ public class DungeonGenerator {
     //     * crea la conexión (ciclo)
     // ----------------------------
     private void closeAllOpenDoorsWithCycles() {
+        List<DoorSlot> unresolved = new ArrayList<>();
+        
         while (!openDoors.isEmpty()) {
             DoorSlot slot = openDoors.pollFirst();
             if (slot == null) break;
 
             Room r = slot.room;
             Direction d = slot.dir;
+            
+            // si esta puerta ya está conectada, omitir
+            if (r.isConnected(d)) continue;
 
             int nx = r.x + d.dx;
             int ny = r.y + d.dy;
@@ -192,29 +302,39 @@ public class DungeonGenerator {
             // si ya hay room, conecta si es posible
             Room neighbor = graph.getRoom(nx, ny);
             if (neighbor != null) {
-                if (neighbor.hasDoor(d.opposite())) {
+                if (neighbor.hasDoor(d.opposite()) && !neighbor.isConnected(d.opposite())) {
                     r.connect(d);
                     neighbor.connect(d.opposite());
                     graph.connect(r, neighbor, d);
-                    removeOpenDoor(r, d);
                     removeOpenDoor(neighbor, d.opposite());
                     continue;
-                } else {
+                } else if (!neighbor.hasDoor(d.opposite())) {
                     // el vecino existe pero no tiene la puerta -> forzamos añadirla
                     addDoorToRoomAndConnect(neighbor, d.opposite(), r);
+                    continue;
+                } else {
+                    // la puerta del vecino ya está conectada, no podemos conectar
+                    unresolved.add(slot);
                     continue;
                 }
             }
 
-            // intentamos colocar SINGLE directamente
-            RoomTemplate closeTpl = RoomTemplate.valueOf(d.opposite().name() + "_SINGLE");
+            // intentamos colocar SINGLE directamente con la puerta hacia el origen
+            RoomTemplate closeTpl = null;
+            try {
+                closeTpl = RoomTemplate.valueOf(d.opposite().name() + "_SINGLE");
+            } catch (IllegalArgumentException e) {
+                // si no existe ese template, marcar como no resuelto
+                unresolved.add(slot);
+                continue;
+            }
 
             if (canPlaceTemplateAt(nx, ny, closeTpl)) {
-                Room end = placeRoom(nx, ny, closeTpl);
+                // Usar placeRoom sin añadir puertas a la cola
+                Room end = placeRoom(nx, ny, closeTpl, false);
                 end.connect(d.opposite());
                 r.connect(d);
                 graph.connect(r, end, d);
-                removeOpenDoor(end, d.opposite());
                 continue;
             }
 
@@ -222,12 +342,68 @@ public class DungeonGenerator {
             Room found = findRoomInDirection(nx, ny, d);
             if (found != null) {
                 // found está en la línea hacia d; conectar r <-> found creando puerta en found
-                addDoorToRoomAndConnect(found, oppositeDirectionFrom(found, r), r);
-            } else {
-                // fallback: si no se encontró nada, intentamos buscar ANY nearby room y forzamos conexión
-                Room any = findAnyNearbyRoom(nx, ny);
-                if (any != null) {
-                    addDoorToRoomAndConnect(any, oppositeDirectionFrom(any, r), r);
+                Direction dirToFound = oppositeDirectionFrom(found, r);
+                if (found.hasDoor(dirToFound) && !found.isConnected(dirToFound)) {
+                    addDoorToRoomAndConnect(found, dirToFound, r);
+                    continue;
+                }
+            }
+            
+            // fallback: si no se encontró nada, intentamos buscar ANY nearby room y forzamos conexión
+            Room any = findAnyNearbyRoom(nx, ny);
+            if (any != null) {
+                Direction dirToAny = oppositeDirectionFrom(any, r);
+                // solo conectar si es posible
+                if (!any.isConnected(dirToAny)) {
+                    addDoorToRoomAndConnect(any, dirToAny, r);
+                    continue;
+                }
+            }
+            
+            // si definitivamente no podemos conectar, marcar para eliminar
+            unresolved.add(slot);
+        }
+        
+        // cerrar puertas que definitivamente van al vacío cambiando su template
+        for (DoorSlot slot : unresolved) {
+            removeDoorFromRoom(slot.room, slot.dir);
+        }
+    }
+    
+    // ----------------------------
+    // validateAndFixAllRooms: elimina puertas no conectadas de todas las habitaciones
+    // ----------------------------
+    private void validateAndFixAllRooms() {
+        for (Room room : graph.getRooms()) {
+            Set<Direction> connectedDoors = EnumSet.noneOf(Direction.class);
+            
+            // recopilar solo las puertas que están realmente conectadas
+            for (Direction d : Direction.values()) {
+                if (room.isConnected(d)) {
+                    connectedDoors.add(d);
+                }
+            }
+            
+            // SIEMPRE actualizar el template para que coincida exactamente con las conexiones
+            Set<Direction> templateDoors = room.getTemplate().getDoors();
+            
+            if (!templateDoors.equals(connectedDoors)) {
+                if (connectedDoors.isEmpty()) {
+                    // Si no hay conexiones, algo salió mal - mantener al menos una puerta
+                    System.err.println("WARNING: Room at (" + room.x + "," + room.y + ") has no connections!");
+                    // Buscar si tiene alguna puerta en el template y mantenerla
+                    if (!templateDoors.isEmpty()) {
+                        connectedDoors.add(templateDoors.iterator().next());
+                    }
+                }
+                
+                if (!connectedDoors.isEmpty()) {
+                    RoomTemplate newTpl = findTemplateWithDoors(connectedDoors);
+                    if (newTpl != null) {
+                        room.setTemplate(newTpl);
+                    } else {
+                        System.err.println("ERROR: Could not find template for doors: " + connectedDoors);
+                    }
                 }
             }
         }
@@ -271,6 +447,44 @@ public class DungeonGenerator {
         }
         return null;
     }
+    
+    // ----------------------------
+    // removeDoorFromRoom: elimina una puerta del template de una habitación
+    // ----------------------------
+    private void removeDoorFromRoom(Room room, Direction dir) {
+        Set<Direction> currentDoors = new HashSet<>(room.getTemplate().getDoors());
+        if (!currentDoors.contains(dir)) return; // no tiene esa puerta
+        
+        // si ya está conectada, no eliminar
+        if (room.isConnected(dir)) return;
+        
+        currentDoors.remove(dir);
+        
+        if (currentDoors.isEmpty()) {
+            // si se quedaría sin puertas, buscar puertas conectadas
+            Set<Direction> connectedDoors = EnumSet.noneOf(Direction.class);
+            for (Direction d : Direction.values()) {
+                if (room.isConnected(d)) {
+                    connectedDoors.add(d);
+                }
+            }
+            
+            if (!connectedDoors.isEmpty()) {
+                currentDoors = connectedDoors;
+            } else {
+                // Último recurso: mantener template original
+                System.err.println("WARNING: Cannot remove door from room at (" + room.x + "," + room.y + ") - no other doors");
+                return;
+            }
+        }
+        
+        RoomTemplate newTpl = findTemplateWithDoors(currentDoors);
+        if (newTpl != null) {
+            room.setTemplate(newTpl);
+        } else {
+            System.err.println("ERROR: Could not find template for remaining doors: " + currentDoors);
+        }
+    }
 
     // ----------------------------
     // Busca la primera room existente en la misma línea (en dirección d)
@@ -279,7 +493,7 @@ public class DungeonGenerator {
     private Room findRoomInDirection(int nx, int ny, Direction d) {
         int step = 1;
         while (step < 50) { // límite razonable para no infinite loop
-            Room r = graph.getRoom(nx + d.dx * (step - 1), ny + d.dy * (step - 1));
+            Room r = graph.getRoom(nx + d.dx * step, ny + d.dy * step);
             if (r != null) return r;
             step++;
         }
