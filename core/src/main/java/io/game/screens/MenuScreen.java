@@ -86,6 +86,7 @@ public class MenuScreen implements Screen {
 		float buttonHeight = screenH * 0.17f;
 		table.add(new Button("play", BASE_PATH, () -> {
 			System.out.println("PLAY");
+			game.gameScreen.restart(); // Reiniciar el juego
 			game.setScreen(game.gameScreen);	
 		}, buttonSound)).width(buttonWidth).height(buttonHeight).row();
 

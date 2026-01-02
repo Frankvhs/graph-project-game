@@ -143,6 +143,13 @@ public class GameScreen implements Screen {
         camera.position.set(player.position.x, player.position.y, 0);
         camera.update();
     }
+    
+    /**
+     * Método público para reiniciar el juego desde el nivel 1
+     */
+    public void restart() {
+        regenerate(1);
+    }
 
     @Override
     public void render(float delta) {
