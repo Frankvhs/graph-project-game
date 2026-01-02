@@ -11,7 +11,9 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
 import io.game.GameMain;
 import io.game.components.Direction;
+import io.game.entities.AnimatedEntity;
 import io.game.entities.characters.Player;
+import io.game.entities.characters.Orc;
 import io.game.generator.DungeonGenerator;
 import io.game.maps.Room;
 import io.game.maps.DungeonGraph;
@@ -25,6 +27,7 @@ public class GameScreen implements Screen {
 
     private SpriteBatch batch;
     private Player player;
+    private List<Orc> enemies;
 
     private DungeonGenerator generator;
     private DungeonRenderer renderer;
@@ -44,6 +47,10 @@ public class GameScreen implements Screen {
 
         Player.loadTextures();
         player = new Player();
+        
+        // Cargar texturas de enemigos
+        Orc.loadTextures();
+        enemies = new ArrayList<>();
 
         // Load rooms
         RoomManager.load();
@@ -93,6 +100,9 @@ public class GameScreen implements Screen {
         // put player in the start room (0,0) center
         player.position.set(0f + tileW * 0.5f, 0f + tileH * 0.5f);
         player.movement.set(0f, 0f);
+        
+        // Generar enemigos aleatoriamente en las habitaciones
+        generateEnemies();
 
         // center camera on player
         camera.position.set(player.position.x, player.position.y, 0);
@@ -112,6 +122,15 @@ public class GameScreen implements Screen {
 
         // update player with collision
         updatePlayerWithCollision(delta);
+        
+        // Actualizar enemigos
+        updateEnemies(delta);
+        
+        // Resolver colisiones entre entidades (empujar para evitar solapamiento)
+        resolveEntityCollisions();
+        
+        // Verificar combate entre jugador y enemigos
+        checkCombat();
 
         // check if player stands over a room with stairs and pressed E
         Room current = getRoomAtPlayer();
@@ -126,6 +145,11 @@ public class GameScreen implements Screen {
         
         // DEBUG: Dibujar colisiones (descomentar para visualizar)
         // renderCollisionDebug(batch);
+        
+        // Renderizar enemigos
+        for (Orc enemy : enemies) {
+            enemy.render(batch);
+        }
         
         player.render(batch);
         batch.end();
@@ -170,16 +194,23 @@ public class GameScreen implements Screen {
     // Verifica si el jugador colisiona con paredes de habitaciones
     // ----------------------------
     private boolean checkCollisionWithWalls() {
-        // player.position es la esquina inferior izquierda del sprite
+        return checkEntityCollisionWithWalls(player);
+    }
+    
+    // ----------------------------
+    // Verifica si una entidad (jugador o enemigo) colisiona con paredes
+    // ----------------------------
+    private boolean checkEntityCollisionWithWalls(AnimatedEntity entity) {
+        // entity.position es la esquina inferior izquierda del sprite
         // El hitbox será un rectángulo centrado en el sprite
-        float playerCenterX = player.position.x + player.size.x * 0.5f;
-        float playerCenterY = player.position.y + player.size.y * 0.5f;
-        // Hitbox: 40% del tamaño del jugador (20% de radio = 40% de ancho)
-        float hitboxRadius = player.size.x * 0.2f;
-        float px1 = playerCenterX - hitboxRadius;
-        float py1 = playerCenterY - hitboxRadius;
-        float px2 = playerCenterX + hitboxRadius;
-        float py2 = playerCenterY + hitboxRadius;
+        float entityCenterX = entity.position.x + entity.size.x * 0.5f;
+        float entityCenterY = entity.position.y + entity.size.y * 0.5f;
+        // Hitbox: 40% del tamaño de la entidad (20% de radio = 40% de ancho)
+        float hitboxRadius = entity.size.x * 0.2f;
+        float px1 = entityCenterX - hitboxRadius;
+        float py1 = entityCenterY - hitboxRadius;
+        float px2 = entityCenterX + hitboxRadius;
+        float py2 = entityCenterY + hitboxRadius;
         
         // Verificar colisión con cada habitación
         for (Room room : dungeon) {
@@ -368,6 +399,15 @@ public class GameScreen implements Screen {
         shapeRenderer.rect(playerCenterX - hitboxRadius, playerCenterY - hitboxRadius, 
                           hitboxRadius * 2, hitboxRadius * 2);
         
+        // Dibujar hitboxes de los enemigos
+        shapeRenderer.setColor(Color.RED);
+        for (Orc enemy : enemies) {
+            float enemyCenterX = enemy.position.x + enemy.size.x * 0.5f;
+            float enemyCenterY = enemy.position.y + enemy.size.y * 0.5f;
+            shapeRenderer.rect(enemyCenterX - hitboxRadius, enemyCenterY - hitboxRadius, 
+                              hitboxRadius * 2, hitboxRadius * 2);
+        }
+        
         shapeRenderer.end();
         batch.begin();
     }
@@ -385,6 +425,164 @@ public class GameScreen implements Screen {
             }
         }
         return null;
+    }
+    
+    // ----------------------------
+    // Genera enemigos aleatoriamente en las habitaciones (excepto la inicial)
+    // ----------------------------
+    private void generateEnemies() {
+        enemies.clear();
+        
+        // Número de enemigos basado en el nivel
+        int enemiesPerRoom = 1 + (level / 3); // más enemigos en niveles altos
+        
+        for (Room room : dungeon) {
+            // No generar enemigos en la habitación inicial (0,0)
+            if (room.x == 0 && room.y == 0) continue;
+            
+            // Probabilidad de que aparezcan enemigos (80%)
+            if (Math.random() < 0.8) {
+                int numEnemies = (int)(Math.random() * enemiesPerRoom) + 1;
+                
+                for (int i = 0; i < numEnemies; i++) {
+                    // Posición aleatoria dentro de la habitación (evitar bordes)
+                    float rx = room.x * tileW + tileW * 0.2f;
+                    float ry = room.y * tileH + tileH * 0.2f;
+                    float maxX = tileW * 0.6f;
+                    float maxY = tileH * 0.6f;
+                    
+                    float x = rx + (float)(Math.random() * maxX);
+                    float y = ry + (float)(Math.random() * maxY);
+                    
+                    Orc orc = new Orc(x, y);
+                    orc.size.set(tileW / 7f, tileH / 7f);
+                    enemies.add(orc);
+                }
+            }
+        }
+    }
+    
+    // ----------------------------
+    // Actualiza la IA de todos los enemigos con colisiones
+    // ----------------------------
+    private void updateEnemies(float delta) {
+        for (Orc enemy : enemies) {
+            if (enemy.health.isDead()) continue;
+            
+            // Guardar posición anterior
+            float oldX = enemy.position.x;
+            float oldY = enemy.position.y;
+            
+            // Actualizar IA y movimiento
+            enemy.updateAI(delta, player.position);
+            enemy.update(delta);
+            
+            // Si no hay movimiento, no verificar colisión
+            if (enemy.movement.isZero()) {
+                continue;
+            }
+            
+            // Verificar colisión con paredes
+            if (checkEntityCollisionWithWalls(enemy)) {
+                // Colisión detectada, intentar movimiento en X solo
+                enemy.position.set(oldX, oldY);
+                enemy.position.x += enemy.movement.x * delta;
+                
+                if (checkEntityCollisionWithWalls(enemy)) {
+                    // Aún hay colisión, intentar solo Y
+                    enemy.position.x = oldX;
+                    enemy.position.y = oldY + enemy.movement.y * delta;
+                    
+                    if (checkEntityCollisionWithWalls(enemy)) {
+                        // Colisión en ambos ejes, restaurar posición original
+                        enemy.position.set(oldX, oldY);
+                    }
+                }
+            }
+        }
+    }
+    
+    // ----------------------------
+    // Resuelve colisiones entre entidades (jugador y enemigos)
+    // Empuja las entidades para evitar que se solapen
+    // ----------------------------
+    private void resolveEntityCollisions() {
+        float collisionRadius = player.size.x * 0.3f; // Radio de colisión
+        
+        // Colisión entre jugador y enemigos
+        for (Orc enemy : enemies) {
+            if (enemy.health.isDead()) continue;
+            
+            float dx = player.position.x - enemy.position.x;
+            float dy = player.position.y - enemy.position.y;
+            float distance = (float) Math.sqrt(dx * dx + dy * dy);
+            
+            if (distance < collisionRadius && distance > 0) {
+                // Las entidades están solapadas, empujar
+                float overlap = collisionRadius - distance;
+                float pushX = (dx / distance) * overlap * 0.5f;
+                float pushY = (dy / distance) * overlap * 0.5f;
+                
+                // Empujar ambas entidades en direcciones opuestas
+                player.position.x += pushX;
+                player.position.y += pushY;
+                enemy.position.x -= pushX;
+                enemy.position.y -= pushY;
+            }
+        }
+        
+        // Colisiones entre enemigos
+        for (int i = 0; i < enemies.size(); i++) {
+            Orc enemy1 = enemies.get(i);
+            if (enemy1.health.isDead()) continue;
+            
+            for (int j = i + 1; j < enemies.size(); j++) {
+                Orc enemy2 = enemies.get(j);
+                if (enemy2.health.isDead()) continue;
+                
+                float dx = enemy1.position.x - enemy2.position.x;
+                float dy = enemy1.position.y - enemy2.position.y;
+                float distance = (float) Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < collisionRadius && distance > 0) {
+                    // Empujar enemigos
+                    float overlap = collisionRadius - distance;
+                    float pushX = (dx / distance) * overlap * 0.5f;
+                    float pushY = (dy / distance) * overlap * 0.5f;
+                    
+                    enemy1.position.x += pushX;
+                    enemy1.position.y += pushY;
+                    enemy2.position.x -= pushX;
+                    enemy2.position.y -= pushY;
+                }
+            }
+        }
+    }
+    
+    // ----------------------------
+    // Verifica combate entre jugador y enemigos
+    // ----------------------------
+    private void checkCombat() {
+        // Verificar si el jugador golpea a enemigos
+        if (player.combat.isAttacking()) {
+            for (Orc enemy : enemies) {
+                if (enemy.health.isDead()) continue;
+                
+                float distance = player.position.dst(enemy.position);
+                if (distance <= player.combat.getAttackRange()) {
+                    enemy.takeDamage(player.combat.getDamage());
+                }
+            }
+        }
+        
+        // Verificar si enemigos golpean al jugador
+        for (Orc enemy : enemies) {
+            if (enemy.health.isDead()) continue;
+            
+            if (enemy.canDamagePlayer(player.position)) {
+                player.takeDamage(enemy.combat.getDamage());
+            }
+        }
     }
 
     @Override public void resize(int width, int height) { viewport.update(width, height); }

@@ -5,6 +5,7 @@ import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.g2d.Animation.PlayMode;
 
 import io.game.components.CombatComponent;
+import io.game.components.HealthComponent;
 import io.game.managers.Resources;
 
 public class Player extends Character {
@@ -31,6 +32,7 @@ public class Player extends Character {
 		position.set(0, 0);
 		maxSpeed = 400;
 		combat = new CombatComponent(100, 0.3f, 10);
+		health = new HealthComponent(100);
 
 		play("idle", BASE_PATH);
 	}
@@ -77,6 +79,21 @@ public class Player extends Character {
 	
 	public boolean wantsNextLevel() {
         return Gdx.input.isKeyJustPressed(Input.Keys.E);
+    }
+    
+    /**
+     * Recibir daño
+     */
+    public void takeDamage(int damage) {
+    	if (health.isDead()) return;
+    	
+    	health.damage(damage);
+    	if (!health.isDead()) {
+    		play("hurt", BASE_PATH);
+    		this.setAnimationDuration(0.3f);
+    	} else {
+    		play("death", BASE_PATH);
+    	}
     }
 
 }
