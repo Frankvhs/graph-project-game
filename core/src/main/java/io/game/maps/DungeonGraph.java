@@ -21,7 +21,6 @@ public class DungeonGraph {
         return (((long) x) << 32) ^ (y & 0xffffffffL);
     }
 
-    /** Limpia todo el grafo (mantiene la instancia) */
     public void clear() {
         graph.clear();
     }

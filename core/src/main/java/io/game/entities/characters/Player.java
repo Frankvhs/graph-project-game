@@ -75,8 +75,7 @@ public class Player extends Character {
 		super.update(dt);
 	}
 	
-	public boolean wantsNextLevel() {
-        return Gdx.input.isKeyJustPressed(Input.Keys.E);
+	public boolean wantsNextLevel() {	
+		return Gdx.input.isKeyJustPressed(Input.Keys.E);
     }
-
 }

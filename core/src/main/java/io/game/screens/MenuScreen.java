@@ -23,6 +23,11 @@ public class MenuScreen implements Screen {
 	private Sound buttonSound;
 	private Image background;
 
+	/*private Texture[] bgFrames;
+	private float bgTimer = 0;
+	private int currentFrame = 0;
+	private float frameDuration = 0.25f;*/
+
 	// Utils
 	private Texture getTexture(String name) {
 		return Resources.getTexture(name, BASE_PATH);
@@ -49,14 +54,24 @@ public class MenuScreen implements Screen {
 		Button.loadDrawable("exit", BASE_PATH);
 
 		//
-		Resources.loadTexture("fondo_menu", BASE_PATH);
+		Resources.loadTexture("1", BASE_PATH);
+		/*Resources.loadTexture("2", BASE_PATH);
+		Resources.loadTexture("3", BASE_PATH);*/
 		Resources.loadTexture("title", BASE_PATH);
 
 		Resources.finish();
 	}
 
 	private void createBackground() {
-		background = new Image(getTexture("fondo_menu"));
+		/*bgFrames = new Texture[] {
+			getTexture("1"),
+			getTexture("2"),
+			getTexture("3")
+		};
+		
+		background = new Image(bgFrames[0]);*/
+		
+		background = new Image(getTexture("1"));
 		background.setSize(Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
 		stage.addActor(background);
 	}
@@ -114,6 +129,16 @@ public class MenuScreen implements Screen {
 	// SCREEN METHODS
 	@Override
 	public void render(float delta) {
+	/* bgTimer += delta;
+
+    if (bgTimer >= frameDuration) {
+        bgTimer = 0;
+        currentFrame = (currentFrame + 1) % bgFrames.length; // ciclo infinito
+
+        background.setDrawable(
+            new Image(bgFrames[currentFrame]).getDrawable()
+        );
+    } */
 		stage.act(delta);
 		stage.draw();
 	}
