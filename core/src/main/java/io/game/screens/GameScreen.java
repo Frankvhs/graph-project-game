@@ -502,14 +502,16 @@ public class GameScreen implements Screen {
                 int numEnemies = (int)(Math.random() * enemiesPerRoom) + 1;
                 
                 for (int i = 0; i < numEnemies; i++) {
-                    // Posición aleatoria dentro de la habitación (evitar bordes)
-                    float rx = room.x * tileW + tileW * 0.2f;
-                    float ry = room.y * tileH + tileH * 0.2f;
-                    float maxX = tileW * 0.6f;
-                    float maxY = tileH * 0.6f;
+                    // Posición en el centro de la habitación
+                    float centerX = room.x * tileW + tileW * 0.5f;
+                    float centerY = room.y * tileH + tileH * 0.5f;
                     
-                    float x = rx + (float)(Math.random() * maxX);
-                    float y = ry + (float)(Math.random() * maxY);
+                    // Pequeña variación aleatoria desde el centro (±20% del tamaño)
+                    float offsetX = (float)(Math.random() - 0.5) * tileW * 0.4f;
+                    float offsetY = (float)(Math.random() - 0.5) * tileH * 0.4f;
+                    
+                    float x = centerX + offsetX;
+                    float y = centerY + offsetY;
                     
                     Orc orc = new Orc(x, y);
                     orc.size.set(tileW / 7f, tileH / 7f);
