@@ -40,6 +40,10 @@ public class Room {
     public void connect(Direction d) {
         connected.put(d, true);
     }
+    
+    public void disconnect(Direction d) {
+        connected.put(d, false);
+    }
 
     public boolean isConnected(Direction d) {
         Boolean b = connected.get(d);

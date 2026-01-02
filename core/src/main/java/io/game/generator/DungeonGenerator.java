@@ -88,19 +88,90 @@ public class DungeonGenerator {
         // ---- cerrar puertas abiertas (cerrado o ciclos) ----
         closeAllOpenDoorsWithCycles();
         
-        // ---- validación final: eliminar todas las puertas no conectadas ----
-        validateAndFixAllRooms();
+        // ---- VALIDACIÓN FINAL MEJORADA: asegurar sincronización perfecta ----
+        // Realizar múltiples pasadas hasta que no haya cambios
+        boolean changesMade = true;
+        int validationPasses = 0;
+        int maxValidationPasses = 3;
         
-        // ---- segunda pasada de validación para asegurar ----
-        // Esto es crítico: revisar nuevamente después de todos los cambios
-        for (Room room : graph.getRooms()) {
-            Set<Direction> templateDoors = new HashSet<>(room.getTemplate().getDoors());
-            for (Direction d : templateDoors) {
-                if (!room.isConnected(d)) {
-                    // Esta puerta no está conectada, eliminarla
-                    removeDoorFromRoom(room, d);
+        while (changesMade && validationPasses < maxValidationPasses) {
+            changesMade = false;
+            validationPasses++;
+            
+            System.out.println("=== Validation pass " + validationPasses + " ===");
+            
+            for (Room room : graph.getRooms()) {
+                // Recopilar SOLO las puertas que están REALMENTE conectadas
+                Set<Direction> actualConnections = EnumSet.noneOf(Direction.class);
+                for (Direction d : Direction.values()) {
+                    if (room.isConnected(d)) {
+                        // Verificar que realmente hay una habitación vecina conectada
+                        Room neighbor = graph.getRoom(room.x + d.dx, room.y + d.dy);
+                        if (neighbor != null && neighbor.isConnected(d.opposite())) {
+                            actualConnections.add(d);
+                        } else {
+                            // La conexión no es válida, limpiarla
+                            System.out.println("  Cleaning invalid connection at (" + room.x + "," + room.y + ") direction " + d);
+                            room.disconnect(d);
+                            changesMade = true;
+                        }
+                    }
+                }
+                
+                // Comparar con el template actual
+                Set<Direction> templateDoors = new HashSet<>(room.getTemplate().getDoors());
+                
+                if (!templateDoors.equals(actualConnections)) {
+                    // Hay desincronización - actualizar template
+                    System.out.println("  Room at (" + room.x + "," + room.y + ") - Template doors: " + templateDoors + " vs Actual connections: " + actualConnections);
+                    
+                    if (actualConnections.isEmpty()) {
+                        System.err.println("WARNING: Room at (" + room.x + "," + room.y + ") has no valid connections!");
+                        // Buscar al menos una puerta del template original
+                        for (Direction d : templateDoors) {
+                            actualConnections.add(d);
+                            break; // solo una puerta
+                        }
+                    }
+                    
+                    RoomTemplate correctedTemplate = findTemplateWithDoors(actualConnections);
+                    if (correctedTemplate != null) {
+                        System.out.println("  -> Updating template from " + room.getTemplate() + " to " + correctedTemplate);
+                        room.setTemplate(correctedTemplate);
+                        changesMade = true;
+                    } else {
+                        System.err.println("ERROR: Could not find template for connections: " + actualConnections + " at room (" + room.x + "," + room.y + ")");
+                    }
                 }
             }
+        }
+        
+        System.out.println("=== Validation completed after " + validationPasses + " passes ===");
+        
+        // ---- REPORTE FINAL: verificar que todas las habitaciones son válidas ----
+        System.out.println("=== Final dungeon validation ===");
+        boolean allValid = true;
+        for (Room room : graph.getRooms()) {
+            Set<Direction> templateDoors = room.getTemplate().getDoors();
+            Set<Direction> connectedDoors = EnumSet.noneOf(Direction.class);
+            
+            for (Direction d : Direction.values()) {
+                if (room.isConnected(d)) {
+                    connectedDoors.add(d);
+                }
+            }
+            
+            if (!templateDoors.equals(connectedDoors)) {
+                System.err.println("ERROR: Room at (" + room.x + "," + room.y + ") has mismatched doors!");
+                System.err.println("  Template: " + templateDoors + " vs Connected: " + connectedDoors);
+                allValid = false;
+            }
+        }
+        
+        if (allValid) {
+            System.out.println("✓ All " + graph.getRooms().size() + " rooms are valid (no doors to void)");
+        } else {
+            System.err.println("✗ Some rooms have invalid doors!");
         }
 
         // ---- colocar escalera en una hoja (habitacion con 1 conexion) ----
