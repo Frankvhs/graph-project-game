@@ -20,6 +20,7 @@ import io.game.maps.Room;
 import io.game.maps.DungeonGraph;
 import io.game.managers.Resources;
 import io.game.managers.RoomManager;
+import io.game.ui.HealthBar;
 import io.game.ui.PauseMenu;
 
 import java.util.ArrayList;
@@ -45,6 +46,7 @@ public class GameScreen implements Screen {
     private Music gameMusic;
     private PauseMenu pauseMenu;
     private GameMain game;
+    private HealthBar healthBar;
 
     public GameScreen(GameMain game) {
         this.game = game;
@@ -100,6 +102,9 @@ public class GameScreen implements Screen {
             () -> { game.setScreen(game.menuScreen); },
             () -> { Gdx.app.exit(); }
         );
+        
+        // Crear barra de vida
+        healthBar = new HealthBar(20, Gdx.graphics.getHeight() - 70, 200, 50);
     }
 
     private void regenerate(int newLevel) {
@@ -173,6 +178,11 @@ public class GameScreen implements Screen {
         }
         
         player.render(batch);
+        
+        // Renderizar UI (barra de vida) usando la cámara de UI
+        batch.setProjectionMatrix(pauseMenu.getStage().getCamera().combined);
+        healthBar.render(batch, player.health, 20);
+        
         batch.end();
         
         // Renderizar menú de pausa sobre el juego

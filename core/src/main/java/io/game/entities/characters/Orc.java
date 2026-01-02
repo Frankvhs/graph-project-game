@@ -26,6 +26,7 @@ public class Orc extends Character {
 	}
 	
 	private State currentState = State.IDLE;
+	private boolean damageApplied = false; // Control para aplicar daño solo una vez por ataque
 
 	/**
 	 * Carga inicial de animaciones (llamar una vez en el setup del juego)
@@ -47,7 +48,7 @@ public class Orc extends Character {
 		maxSpeed = 200; // más lento que el jugador
 		
 		// Componentes de combate y salud
-		combat = new CombatComponent(20, 1.0f, attackRange);
+		combat = new CombatComponent(5, 1.0f, attackRange);
 		health = new HealthComponent(50);
 
 		play("idle", BASE_PATH);
@@ -127,6 +128,10 @@ public class Orc extends Character {
 				if (combat.tryAttack()) {
 					play("attack01", BASE_PATH);
 					this.setAnimationDuration(combat.getCooldown());
+					damageApplied = false; // Resetear para el nuevo ataque
+				} else if (this.animation.equals(Resources.getAnimation("attack01", BASE_PATH)) && isAnimationFinished()) {
+					// Si la animación de ataque terminó, volver a idle
+					play("idle", BASE_PATH);
 				}
 				
 				// Orientarse hacia el jugador
@@ -145,12 +150,33 @@ public class Orc extends Character {
 	}
 	
 	/**
-	 * Verifica si el orco puede atacar al jugador (está en rango y atacando)
+	 * Verifica si el orco puede atacar al jugador (está en rango y la animación de ataque llegó al punto de impacto)
 	 */
 	public boolean canDamagePlayer(Vector2 playerPosition) {
-		if (!combat.isAttacking()) return false;
+		// Solo aplicar daño si no se ha aplicado ya en este ataque
+		if (damageApplied) return false;
+		
+		if (!combat.isAttacking()) {
+			return false;
+		}
+		
+		// Solo aplicar daño si estamos reproduciendo la animación de ataque (no idle)
+		if (!this.animation.equals(Resources.getAnimation("attack01", BASE_PATH))) {
+			return false;
+		}
+		
+		// Verificar que la animación esté en una ventana específica (70%-80%) para aplicar el daño
+		// Esto evita aplicar daño múltiples veces
+		float progress = animationState / animation.getAnimationDuration();
+		if (progress < 0.7f || progress > 0.8f) return false;
+		
 		float distance = position.dst(playerPosition);
-		return distance <= combat.getAttackRange();
+		if (distance <= combat.getAttackRange()) {
+			damageApplied = true; // Marcar que el daño fue aplicado
+			return true;
+		}
+		
+		return false;
 	}
 	
 	/**

@@ -18,7 +18,7 @@ public class Player extends Character {
 	public static void loadTextures() {
 		Resources.loadAnimation("idle", BASE_PATH, 100, 100, 0.1f, 35, 35, PlayMode.LOOP);
 		Resources.loadAnimation("walk", BASE_PATH, 100, 100, 0.1f, 35, 35, PlayMode.LOOP);
-		Resources.loadAnimation("hurt", BASE_PATH, 100, 100, 0.1f, 35, 35, PlayMode.LOOP);
+		Resources.loadAnimation("hurt", BASE_PATH, 100, 100, 0.1f, 35, 35, PlayMode.NORMAL);
 		Resources.loadAnimation("death", BASE_PATH, 100, 100, 0.1f, 35, 35, PlayMode.NORMAL);
 		Resources.loadAnimation("attack01", BASE_PATH, 100, 100, 0.1f, 35, 35, PlayMode.NORMAL);
 		Resources.loadAnimation("attack02", BASE_PATH, 100, 100, 0.1f, 35, 35, PlayMode.NORMAL);
@@ -32,13 +32,24 @@ public class Player extends Character {
 		position.set(0, 0);
 		maxSpeed = 400;
 		combat = new CombatComponent(100, 0.3f, 10);
-		health = new HealthComponent(100);
+		health = new HealthComponent(20);
 
 		play("idle", BASE_PATH);
 	}
 
 	@Override
 	public void update(float dt) {
+		// Si está muerto, no procesar input ni movimiento
+		if (health.isDead()) {
+			movement.set(0, 0);
+			// Reproducir animación de muerte si aún no se ha reproducido
+			if (!this.animation.equals(Resources.getAnimation("death", BASE_PATH))) {
+				play("death", BASE_PATH);
+			}
+			super.update(dt);
+			return;
+		}
+		
 		boolean up = Gdx.input.isKeyPressed(Input.Keys.W) || Gdx.input.isKeyPressed(Input.Keys.UP);
 		boolean down = Gdx.input.isKeyPressed(Input.Keys.S) || Gdx.input.isKeyPressed(Input.Keys.DOWN);
 		boolean left = Gdx.input.isKeyPressed(Input.Keys.A) || Gdx.input.isKeyPressed(Input.Keys.LEFT);
@@ -65,8 +76,17 @@ public class Player extends Character {
 			}
 		}
 
-		// Solo cambiar animación si no está atacando
-		if (!combat.isAttacking()) {
+		// Solo cambiar animación si no está atacando ni herido
+		if (!combat.isAttacking() && !this.animation.equals(Resources.getAnimation("hurt", BASE_PATH))) {
+			if (!movement.isZero()) {
+				play("walk", BASE_PATH);
+			} else {
+				play("idle", BASE_PATH);
+			}
+		}
+		
+		// Si la animación de hurt terminó, volver a idle/walk
+		if (this.animation.equals(Resources.getAnimation("hurt", BASE_PATH)) && isAnimationFinished()) {
 			if (!movement.isZero()) {
 				play("walk", BASE_PATH);
 			} else {

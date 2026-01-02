@@ -114,6 +114,10 @@ public class PauseMenu {
         return isVisible;
     }
     
+    public Stage getStage() {
+        return stage;
+    }
+    
     public void toggle() {
         if (isVisible) {
             hide();

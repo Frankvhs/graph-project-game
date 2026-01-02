@@ -25,4 +25,8 @@ public class HealthComponent {
     public int getHealth() {
         return currentHealth;
     }
+    
+    public int getMaxHealth() {
+        return maxHealth;
+    }
 }

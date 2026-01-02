@@ -7,7 +7,7 @@ import io.game.managers.Resources;
 
 public class AnimatedEntity extends Entity {
 	protected Animation<TextureRegion> animation;
-	private float animationState = 0f;
+	protected float animationState = 0f;
 	private float animationDuration = 0;
 
 	public void play(Animation<TextureRegion> anim) {
@@ -35,7 +35,7 @@ public class AnimatedEntity extends Entity {
 	}
 
 	public TextureRegion getFrame() {
-		return animation.getKeyFrame(animationState, true);
+		return animation.getKeyFrame(animationState, false);
 	}
 	
 	public void setAnimationDuration(float animationDuration) {
@@ -45,6 +45,17 @@ public class AnimatedEntity extends Entity {
 
 	public boolean isAnimationFinished() {
 		return animation.isAnimationFinished(animationState);
+	}
+	
+	/**
+	 * Verifica si la animación ha progresado al menos un cierto porcentaje
+	 * @param progress Valor entre 0.0 y 1.0 (ej: 0.7 = 70%)
+	 * @return true si la animación ha progresado al menos ese porcentaje
+	 */
+	public boolean isAnimationAtLeast(float progress) {
+		if (animation == null) return false;
+		float totalDuration = animation.getAnimationDuration();
+		return animationState >= (totalDuration * progress);
 	}
 
 }
