@@ -20,6 +20,7 @@ import io.game.maps.Room;
 import io.game.maps.DungeonGraph;
 import io.game.managers.Resources;
 import io.game.managers.RoomManager;
+import io.game.ui.GameOverScreen;
 import io.game.ui.HealthBar;
 import io.game.ui.PauseMenu;
 
@@ -47,6 +48,7 @@ public class GameScreen implements Screen {
     private PauseMenu pauseMenu;
     private GameMain game;
     private HealthBar healthBar;
+    private GameOverScreen gameOverScreen;
 
     public GameScreen(GameMain game) {
         this.game = game;
@@ -105,6 +107,13 @@ public class GameScreen implements Screen {
         
         // Crear barra de vida
         healthBar = new HealthBar(20, Gdx.graphics.getHeight() - 70, 200, 50);
+        
+        // Crear pantalla de game over
+        gameOverScreen = new GameOverScreen(
+            batch,
+            () -> { regenerate(1); }, // Reiniciar en nivel 1
+            () -> { Gdx.app.exit(); } // Salir del juego
+        );
     }
 
     private void regenerate(int newLevel) {
@@ -118,6 +127,14 @@ public class GameScreen implements Screen {
         // put player in the start room (0,0) center
         player.position.set(0f + tileW * 0.5f, 0f + tileH * 0.5f);
         player.movement.set(0f, 0f);
+        
+        // Restaurar la salud del jugador al reiniciar
+        player.health.heal(player.health.getMaxHealth());
+        
+        // Ocultar game over si está visible
+        if (gameOverScreen != null && gameOverScreen.isVisible()) {
+            gameOverScreen.hide();
+        }
         
         // Generar enemigos aleatoriamente en las habitaciones
         generateEnemies();
@@ -134,6 +151,11 @@ public class GameScreen implements Screen {
             pauseMenu.toggle();
         }
         
+        // Verificar si el jugador murió
+        if (player.health.isDead() && !gameOverScreen.isVisible()) {
+            gameOverScreen.show();
+        }
+        
         ScreenUtils.clear(Color.BLACK);
 
         // move camera with player
@@ -143,8 +165,8 @@ public class GameScreen implements Screen {
         viewport.apply();
         batch.setProjectionMatrix(camera.combined);
 
-        // Solo actualizar el juego si el menú de pausa no está visible
-        if (!pauseMenu.isVisible()) {
+        // Solo actualizar el juego si el menú de pausa y game over no están visibles
+        if (!pauseMenu.isVisible() && !gameOverScreen.isVisible()) {
             // update player with collision
             updatePlayerWithCollision(delta);
             
@@ -187,6 +209,9 @@ public class GameScreen implements Screen {
         
         // Renderizar menú de pausa sobre el juego
         pauseMenu.render(delta);
+        
+        // Renderizar game over sobre todo
+        gameOverScreen.render(delta);
     }
     
     // ----------------------------
@@ -620,6 +645,7 @@ public class GameScreen implements Screen {
     @Override public void resize(int width, int height) { 
         viewport.update(width, height);
         pauseMenu.resize(width, height);
+        gameOverScreen.resize(width, height);
     }
     @Override public void show() { 
         gameMusic.play(); 
@@ -632,6 +658,7 @@ public class GameScreen implements Screen {
         if (gameMusic != null) gameMusic.dispose();
         if (renderer != null) renderer.dispose();
         if (pauseMenu != null) pauseMenu.dispose();
+        if (gameOverScreen != null) gameOverScreen.dispose();
         if (viewport != null) viewport = null;
         if (camera != null) camera = null;
     }
