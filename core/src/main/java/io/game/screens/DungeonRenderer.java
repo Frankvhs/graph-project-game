@@ -18,7 +18,7 @@ public class DungeonRenderer {
         this.tileH = tileH;
         
         bg = Resources.getTexture("background", "graphics/tilesets/dungeons_tilesets");
-        stairsTex = Resources.getTexture("stairs", "graphics/tilesets/dungeons_tilesets");
+        stairsTex = Resources.getTexture("down_stairs", "graphics/sprites/world_objects");
     }
 
     public void render(SpriteBatch batch, Iterable<Room> rooms) {
@@ -48,9 +48,8 @@ public class DungeonRenderer {
 
             // ===== 3. Dibujar escalera si la hay =====
             if (r.hasStairs && stairsTex != null) {
-                // la habitación es 160x160 lógico (sprite). Las paredes 16px => espacio libre central = 128
-                // escalera original 16px -> ratio = 160 / 16 = 10 -> stairSize = tileW / 10
-                float stairSize = tileW / 10f;
+                // Escalar las escaleras para que ocupen un espacio apropiado en el centro de la habitación
+                float stairSize = tileW / 4f; // Escaleras más grandes y visibles
                 float cx = px + tileW * 0.5f - stairSize * 0.5f;
                 float cy = py + tileH * 0.5f - stairSize * 0.5f;
                 batch.setColor(Color.WHITE);

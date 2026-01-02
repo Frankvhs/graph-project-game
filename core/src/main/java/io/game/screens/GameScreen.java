@@ -11,6 +11,7 @@ import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
 import io.game.GameMain;
+import io.game.components.Direction;
 import io.game.entities.characters.Player;
 import io.game.generator.DungeonGenerator;
 import io.game.maps.Room;
@@ -53,7 +54,7 @@ public class GameScreen implements Screen {
 
         // === initial scaling and camera ===
         float screenW = Gdx.graphics.getWidth();
-        int roomsVisibleX = 3;
+        float roomsVisibleX = 2.5f; // Habitaciones más grandes (antes 3)
         tileW = screenW / roomsVisibleX;
         tileH = tileW;
 
@@ -61,7 +62,7 @@ public class GameScreen implements Screen {
 
         // Load dungeon textures
         Resources.loadTexture("background", "graphics/tilesets/dungeons_tilesets");
-        Resources.loadTexture("stairs", "graphics/tilesets/dungeons_tilesets");
+        Resources.loadTexture("down_stairs", "graphics/sprites/world_objects");
         Resources.finish();
 
         renderer = new DungeonRenderer(tileW, tileH);
@@ -136,8 +137,8 @@ public class GameScreen implements Screen {
         viewport.apply();
         batch.setProjectionMatrix(camera.combined);
 
-        // update player
-        player.update(delta);
+        // update player with collision
+        updatePlayerWithCollision(delta);
 
         // check if player stands over a room with stairs and pressed E
         Room current = getRoomAtPlayer();
@@ -159,9 +160,254 @@ public class GameScreen implements Screen {
         // render
         batch.begin();
         renderer.render(batch, dungeon);
+        
+        // DEBUG: Dibujar colisiones (descomentar para visualizar)
+        // renderCollisionDebug(batch);
+        
         player.render(batch);
         
         batch.end();
+    }
+    
+    // ----------------------------
+    // Actualiza el jugador con detección de colisiones contra paredes
+    // ----------------------------
+    private void updatePlayerWithCollision(float delta) {
+        // Guardar posición anterior
+        float oldX = player.position.x;
+        float oldY = player.position.y;
+        
+        // Actualizar jugador (calcula movimiento)
+        player.update(delta);
+        
+        // Si no hay movimiento, no hay colisión que verificar
+        if (player.movement.isZero()) {
+            return;
+        }
+        
+        // Verificar colisión y ajustar posición si es necesario
+        if (checkCollisionWithWalls()) {
+            // Colisión detectada, intentar movimiento en X solo
+            player.position.set(oldX, oldY);
+            player.position.x += player.movement.x * delta;
+            
+            if (checkCollisionWithWalls()) {
+                // Aún hay colisión, intentar solo Y
+                player.position.x = oldX;
+                player.position.y = oldY + player.movement.y * delta;
+                
+                if (checkCollisionWithWalls()) {
+                    // Colisión en ambos ejes, restaurar posición original
+                    player.position.set(oldX, oldY);
+                }
+            }
+        }
+    }
+    
+    // ----------------------------
+    // Verifica si el jugador colisiona con paredes de habitaciones
+    // ----------------------------
+    private boolean checkCollisionWithWalls() {
+        // player.position es la esquina inferior izquierda del sprite
+        // El hitbox será un rectángulo centrado en el sprite
+        float playerCenterX = player.position.x + player.size.x * 0.5f;
+        float playerCenterY = player.position.y + player.size.y * 0.5f;
+        // Hitbox: 40% del tamaño del jugador (20% de radio = 40% de ancho)
+        float hitboxRadius = player.size.x * 0.2f;
+        float px1 = playerCenterX - hitboxRadius;
+        float py1 = playerCenterY - hitboxRadius;
+        float px2 = playerCenterX + hitboxRadius;
+        float py2 = playerCenterY + hitboxRadius;
+        
+        // Verificar colisión con cada habitación
+        for (Room room : dungeon) {
+            float rx = room.x * tileW;
+            float ry = room.y * tileH;
+            
+            // Grosor de pared visible en sprites (aproximadamente 14% del tile)
+            float wallThickness = tileW * 0.14f;
+            // Ancho de la puerta (11% desde el centro = 22% apertura total)
+            float doorHalfWidth = tileW * 0.11f;
+            
+            // PARED NORTE (arriba) - borde interno
+            if (!room.hasDoor(Direction.N)) {
+                // Pared completa: desde borde interno hacia adentro
+                float wallInnerY = ry + tileH - wallThickness;
+                if (intersects(px1, py1, px2, py2,
+                              rx, wallInnerY, rx + tileW, ry + tileH)) {
+                    return true;
+                }
+            } else {
+                // Pared con puerta - dos segmentos a los lados (extendidos hasta el borde)
+                float centerX = rx + tileW * 0.5f;
+                float wallInnerY = ry + tileH - wallThickness;
+                // Segmento izquierdo (hasta el borde izquierdo completo)
+                if (intersects(px1, py1, px2, py2,
+                              rx, wallInnerY, centerX - doorHalfWidth, ry + tileH)) {
+                    return true;
+                }
+                // Segmento derecho (hasta el borde derecho completo)
+                if (intersects(px1, py1, px2, py2,
+                              centerX + doorHalfWidth, wallInnerY, rx + tileW, ry + tileH)) {
+                    return true;
+                }
+            }
+            
+            // PARED SUR (abajo) - borde interno
+            if (!room.hasDoor(Direction.S)) {
+                // Pared completa
+                float wallInnerY = ry + wallThickness;
+                if (intersects(px1, py1, px2, py2,
+                              rx, ry, rx + tileW, wallInnerY)) {
+                    return true;
+                }
+            } else {
+                // Pared con puerta - dos segmentos a los lados (extendidos hasta los bordes)
+                float centerX = rx + tileW * 0.5f;
+                float wallInnerY = ry + wallThickness;
+                // Segmento izquierdo (hasta el borde izquierdo completo)
+                if (intersects(px1, py1, px2, py2,
+                              rx, ry, centerX - doorHalfWidth, wallInnerY)) {
+                    return true;
+                }
+                // Segmento derecho (hasta el borde derecho completo)
+                if (intersects(px1, py1, px2, py2,
+                              centerX + doorHalfWidth, ry, rx + tileW, wallInnerY)) {
+                    return true;
+                }
+            }
+            
+            // PARED ESTE (derecha) - borde interno
+            if (!room.hasDoor(Direction.E)) {
+                // Pared completa
+                float wallInnerX = rx + tileW - wallThickness;
+                if (intersects(px1, py1, px2, py2,
+                              wallInnerX, ry, rx + tileW, ry + tileH)) {
+                    return true;
+                }
+            } else {
+                // Pared con puerta - dos segmentos arriba y abajo (extendidos hasta los bordes)
+                float centerY = ry + tileH * 0.5f;
+                float wallInnerX = rx + tileW - wallThickness;
+                // Segmento inferior (hasta el borde inferior completo)
+                if (intersects(px1, py1, px2, py2,
+                              wallInnerX, ry, rx + tileW, centerY - doorHalfWidth)) {
+                    return true;
+                }
+                // Segmento superior (hasta el borde superior completo)
+                if (intersects(px1, py1, px2, py2,
+                              wallInnerX, centerY + doorHalfWidth, rx + tileW, ry + tileH)) {
+                    return true;
+                }
+            }
+            
+            // PARED OESTE (izquierda) - borde interno
+            if (!room.hasDoor(Direction.O)) {
+                // Pared completa
+                float wallInnerX = rx + wallThickness;
+                if (intersects(px1, py1, px2, py2,
+                              rx, ry, wallInnerX, ry + tileH)) {
+                    return true;
+                }
+            } else {
+                // Pared con puerta - dos segmentos arriba y abajo (extendidos hasta los bordes)
+                float centerY = ry + tileH * 0.5f;
+                float wallInnerX = rx + wallThickness;
+                // Segmento inferior (hasta el borde inferior completo)
+                if (intersects(px1, py1, px2, py2,
+                              rx, ry, wallInnerX, centerY - doorHalfWidth)) {
+                    return true;
+                }
+                // Segmento superior (hasta el borde superior completo)
+                if (intersects(px1, py1, px2, py2,
+                              rx, centerY + doorHalfWidth, wallInnerX, ry + tileH)) {
+                    return true;
+                }
+            }
+        }
+        
+        return false;
+    }
+    
+    // Helper: verifica si dos rectángulos AABB se intersectan
+    private boolean intersects(float x1, float y1, float x2, float y2,
+                               float x3, float y3, float x4, float y4) {
+        return x1 < x4 && x2 > x3 && y1 < y4 && y2 > y3;
+    }
+    
+    // DEBUG: Renderizar las cajas de colisión para visualizar dónde están
+    private void renderCollisionDebug(SpriteBatch batch) {
+        batch.end();
+        
+        // Usar ShapeRenderer para dibujar rectángulos
+        com.badlogic.gdx.graphics.glutils.ShapeRenderer shapeRenderer = 
+            new com.badlogic.gdx.graphics.glutils.ShapeRenderer();
+        shapeRenderer.setProjectionMatrix(camera.combined);
+        shapeRenderer.begin(com.badlogic.gdx.graphics.glutils.ShapeRenderer.ShapeType.Line);
+        shapeRenderer.setColor(Color.RED);
+        
+        for (Room room : dungeon) {
+            float rx = room.x * tileW;
+            float ry = room.y * tileH;
+            float wallThickness = tileW * 0.14f;
+            float doorHalfWidth = tileW * 0.11f;
+            
+            // Dibujar paredes según tengan o no puertas (en borde interno)
+            // NORTE
+            if (!room.hasDoor(Direction.N)) {
+                float wallInnerY = ry + tileH - wallThickness;
+                shapeRenderer.rect(rx, wallInnerY, tileW, wallThickness);
+            } else {
+                float centerX = rx + tileW * 0.5f;
+                float wallInnerY = ry + tileH - wallThickness;
+                shapeRenderer.rect(rx, wallInnerY, centerX - doorHalfWidth - rx, wallThickness);
+                shapeRenderer.rect(centerX + doorHalfWidth, wallInnerY, rx + tileW - (centerX + doorHalfWidth), wallThickness);
+            }
+            
+            // SUR
+            if (!room.hasDoor(Direction.S)) {
+                float wallInnerY = ry + wallThickness;
+                shapeRenderer.rect(rx, ry, tileW, wallThickness);
+            } else {
+                float centerX = rx + tileW * 0.5f;
+                float wallInnerY = ry + wallThickness;
+                shapeRenderer.rect(rx, ry, centerX - doorHalfWidth - rx, wallThickness);
+                shapeRenderer.rect(centerX + doorHalfWidth, ry, rx + tileW - (centerX + doorHalfWidth), wallThickness);
+            }
+            
+            // ESTE
+            if (!room.hasDoor(Direction.E)) {
+                float wallInnerX = rx + tileW - wallThickness;
+                shapeRenderer.rect(wallInnerX, ry, wallThickness, tileH);
+            } else {
+                float centerY = ry + tileH * 0.5f;
+                float wallInnerX = rx + tileW - wallThickness;
+                shapeRenderer.rect(wallInnerX, ry, wallThickness, centerY - doorHalfWidth - ry);
+                shapeRenderer.rect(wallInnerX, centerY + doorHalfWidth, wallThickness, ry + tileH - (centerY + doorHalfWidth));
+            }
+            
+            // OESTE
+            if (!room.hasDoor(Direction.O)) {
+                float wallInnerX = rx + wallThickness;
+                shapeRenderer.rect(rx, ry, wallThickness, tileH);
+            } else {
+                float centerY = ry + tileH * 0.5f;
+                float wallInnerX = rx + wallThickness;
+                shapeRenderer.rect(rx, ry, wallThickness, centerY - doorHalfWidth - ry);
+                shapeRenderer.rect(rx, centerY + doorHalfWidth, wallThickness, ry + tileH - (centerY + doorHalfWidth));
+            }
+        }
+        
+        // Dibujar hitbox del jugador (centrado en el sprite)
+        shapeRenderer.setColor(Color.GREEN);
+        float playerCenterX = player.position.x + player.size.x * 0.5f;
+        float playerCenterY = player.position.y + player.size.y * 0.5f;
+        float hitboxRadius = player.size.x * 0.2f;
+        shapeRenderer.rect(playerCenterX - hitboxRadius, playerCenterY - hitboxRadius, 
+                          hitboxRadius * 2, hitboxRadius * 2);
+        
+        shapeRenderer.end();
+        batch.begin();
     }
 
     private Room getRoomAtPlayer() {
