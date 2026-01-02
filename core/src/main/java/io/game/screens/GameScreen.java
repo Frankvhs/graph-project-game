@@ -1,6 +1,7 @@
 package io.game.screens;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.audio.Music;
 import com.badlogic.gdx.graphics.Color;
@@ -19,6 +20,7 @@ import io.game.maps.Room;
 import io.game.maps.DungeonGraph;
 import io.game.managers.Resources;
 import io.game.managers.RoomManager;
+import io.game.ui.PauseMenu;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -41,8 +43,11 @@ public class GameScreen implements Screen {
     private int level = 1;
 
     private Music gameMusic;
+    private PauseMenu pauseMenu;
+    private GameMain game;
 
     public GameScreen(GameMain game) {
+        this.game = game;
         this.batch = game.batch;
 
         Player.loadTextures();
@@ -87,6 +92,14 @@ public class GameScreen implements Screen {
         gameMusic = Gdx.audio.newMusic(Gdx.files.internal("audio/music/S2.mp3"));
         gameMusic.setLooping(true);
         gameMusic.setVolume(0.7f);
+        
+        // Crear menú de pausa
+        pauseMenu = new PauseMenu(
+            batch,
+            () -> { /* Continuar juego */ },
+            () -> { game.setScreen(game.menuScreen); },
+            () -> { Gdx.app.exit(); }
+        );
     }
 
     private void regenerate(int newLevel) {
@@ -111,6 +124,11 @@ public class GameScreen implements Screen {
 
     @Override
     public void render(float delta) {
+        // Detectar tecla ESC para pausar/despausar
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+            pauseMenu.toggle();
+        }
+        
         ScreenUtils.clear(Color.BLACK);
 
         // move camera with player
@@ -120,23 +138,26 @@ public class GameScreen implements Screen {
         viewport.apply();
         batch.setProjectionMatrix(camera.combined);
 
-        // update player with collision
-        updatePlayerWithCollision(delta);
-        
-        // Actualizar enemigos
-        updateEnemies(delta);
-        
-        // Resolver colisiones entre entidades (empujar para evitar solapamiento)
-        resolveEntityCollisions();
-        
-        // Verificar combate entre jugador y enemigos
-        checkCombat();
+        // Solo actualizar el juego si el menú de pausa no está visible
+        if (!pauseMenu.isVisible()) {
+            // update player with collision
+            updatePlayerWithCollision(delta);
+            
+            // Actualizar enemigos
+            updateEnemies(delta);
+            
+            // Resolver colisiones entre entidades (empujar para evitar solapamiento)
+            resolveEntityCollisions();
+            
+            // Verificar combate entre jugador y enemigos
+            checkCombat();
 
-        // check if player stands over a room with stairs and pressed E
-        Room current = getRoomAtPlayer();
-        if (current != null && current.hasStairs && player.wantsNextLevel()) {
-            regenerate(level + 1);
-            return; // skip one frame to avoid input repeat
+            // check if player stands over a room with stairs and pressed E
+            Room current = getRoomAtPlayer();
+            if (current != null && current.hasStairs && player.wantsNextLevel()) {
+                regenerate(level + 1);
+                return; // skip one frame to avoid input repeat
+            }
         }
 
         // render
@@ -153,6 +174,9 @@ public class GameScreen implements Screen {
         
         player.render(batch);
         batch.end();
+        
+        // Renderizar menú de pausa sobre el juego
+        pauseMenu.render(delta);
     }
     
     // ----------------------------
@@ -359,11 +383,9 @@ public class GameScreen implements Screen {
             
             // SUR
             if (!room.hasDoor(Direction.S)) {
-                float wallInnerY = ry + wallThickness;
                 shapeRenderer.rect(rx, ry, tileW, wallThickness);
             } else {
                 float centerX = rx + tileW * 0.5f;
-                float wallInnerY = ry + wallThickness;
                 shapeRenderer.rect(rx, ry, centerX - doorHalfWidth - rx, wallThickness);
                 shapeRenderer.rect(centerX + doorHalfWidth, ry, rx + tileW - (centerX + doorHalfWidth), wallThickness);
             }
@@ -585,7 +607,10 @@ public class GameScreen implements Screen {
         }
     }
 
-    @Override public void resize(int width, int height) { viewport.update(width, height); }
+    @Override public void resize(int width, int height) { 
+        viewport.update(width, height);
+        pauseMenu.resize(width, height);
+    }
     @Override public void show() { 
         gameMusic.play(); 
         Gdx.input.setInputProcessor(null); 
@@ -596,6 +621,7 @@ public class GameScreen implements Screen {
     @Override public void dispose() {
         if (gameMusic != null) gameMusic.dispose();
         if (renderer != null) renderer.dispose();
+        if (pauseMenu != null) pauseMenu.dispose();
         if (viewport != null) viewport = null;
         if (camera != null) camera = null;
     }
