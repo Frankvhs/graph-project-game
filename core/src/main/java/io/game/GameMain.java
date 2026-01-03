@@ -1,7 +1,6 @@
 package io.game;
 
 import com.badlogic.gdx.Game;
-import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 
 import io.game.managers.Resources;
@@ -13,6 +12,7 @@ public class GameMain extends Game {
     public SpriteBatch batch;
     public MenuScreen menuScreen;
     public GameScreen gameScreen;
+    public boolean needGameReset = false;
 
     @Override
     public void create() {
@@ -20,7 +20,7 @@ public class GameMain extends Game {
 
         Resources.finish();
         
-        // pantallas
+        // Crear pantallas
         menuScreen = new MenuScreen(this);
         gameScreen = new GameScreen(this);
         
@@ -29,14 +29,21 @@ public class GameMain extends Game {
 
     @Override
     public void render() {
-        screen.render(Gdx.graphics.getDeltaTime());
+        super.render();
     }
 
     @Override
     public void dispose() {
-        menuScreen.dispose();
-        batch.dispose();
-        gameScreen.dispose();
+        super.dispose();
+        if (menuScreen != null) {
+            menuScreen.dispose();
+        }
+        if (gameScreen != null) {
+            gameScreen.dispose();
+        }
+        if (batch != null) {
+            batch.dispose();
+        }
         Resources.dispose();
     }
 }

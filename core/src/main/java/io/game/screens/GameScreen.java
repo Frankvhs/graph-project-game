@@ -1,12 +1,14 @@
+
 package io.game.screens;
 
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.InputProcessor;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.audio.Music;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.scenes.scene2d.Stage;
 import com.badlogic.gdx.utils.ScreenUtils;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
@@ -15,6 +17,8 @@ import io.game.components.Direction;
 import io.game.entities.characters.Player;
 import io.game.generator.DungeonGenerator;
 import io.game.maps.Room;
+import io.game.modal.GameOverModal;
+import io.game.modal.PauseModal;
 import io.game.maps.DungeonGraph;
 import io.game.managers.Resources;
 import io.game.managers.RoomManager;
@@ -42,6 +46,13 @@ public class GameScreen implements Screen {
     private boolean canUseStairs = true;
     private float stairsCooldown = 0.5f;
     private float currentCooldown = 0f;
+
+    private boolean isPaused = false;
+    private boolean isGameOver = false;
+
+    private Stage uiStage;
+    private PauseModal pauseModal;
+    private GameOverModal gameOverModal;
 
     public GameScreen(GameMain game) {
         this.batch = game.batch;
@@ -86,10 +97,44 @@ public class GameScreen implements Screen {
         gameMusic.setLooping(true);
         gameMusic.setVolume(0.7f);
         
-        // Configurar input processor
-        if (player instanceof InputProcessor) {
-            Gdx.input.setInputProcessor((InputProcessor) player);
-        }
+        uiStage = new Stage(new ScreenViewport());
+
+        // PAUSE MODAL
+        pauseModal = new PauseModal(uiStage, new PauseModal.Listener() {
+            @Override
+            public void onContinue() {
+                isPaused = false;
+                pauseModal.hide();
+                gameMusic.play();
+            }
+
+            @Override
+            public void onExitToMenu() {
+                gameMusic.stop();
+                dispose();
+                game.setScreen(new MenuScreen(game));
+            }
+
+            @Override
+            public void onExitGame() {
+                Gdx.app.exit();
+            }
+        });
+
+        // GAME OVER MODAL
+        gameOverModal = new GameOverModal(uiStage, new GameOverModal.Listener() {
+            @Override
+            public void onRestart() {
+                dispose();
+                game.setScreen(new GameScreen(game));
+            }
+
+            @Override
+            public void onExitToMenu() {
+                dispose();
+                game.setScreen(new MenuScreen(game));
+            }
+        });
     }
     
     /**
@@ -119,6 +164,25 @@ public class GameScreen implements Screen {
 
     @Override
     public void render(float delta) {
+        if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
+
+            isPaused = !isPaused;
+
+            if (isPaused) {
+                pauseModal.show();
+                gameMusic.pause();
+                Gdx.input.setInputProcessor(uiStage);
+            } else {
+                pauseModal.hide();
+                gameMusic.play();
+                Gdx.input.setInputProcessor(null);
+            }
+        }
+
+        if (Gdx.input.isKeyJustPressed(com.badlogic.gdx.Input.Keys.F) && !isGameOver) {
+            player.kill();
+        }
+
         // Actualizar cooldown de escaleras
         if (!canUseStairs) {
             currentCooldown += delta;
@@ -138,11 +202,23 @@ public class GameScreen implements Screen {
         batch.setProjectionMatrix(camera.combined);
 
         // update player with collision
-        updatePlayerWithCollision(delta);
+        if (!isPaused && !isGameOver) {
+            updatePlayerWithCollision(delta);
+        }
+
+        // Verificar muerte del jugador
+        if (!player.isAlive() && !isGameOver) {
+            isGameOver = true;
+            isPaused = false;
+            player.movement.setZero();
+            gameMusic.pause();
+            gameOverModal.show();
+            Gdx.input.setInputProcessor(uiStage);
+        }
 
         // check if player stands over a room with stairs and pressed E
         Room current = getRoomAtPlayer();
-        if (current != null && current.hasStairs && player.wantsNextLevel() && canUseStairs) {
+        if (!isPaused && !isGameOver && current != null && current.hasStairs && player.wantsNextLevel() && canUseStairs) {
             canUseStairs = false;
             
             // Generar nuevo nivel
@@ -167,19 +243,31 @@ public class GameScreen implements Screen {
         player.render(batch);
         
         batch.end();
+
+        if (isPaused || isGameOver) {
+            uiStage.act(delta);
+            uiStage.draw();
+        }
+
+        if (isGameOver) {
+            gameOverModal.update();
+        }
     }
-    
+
     // ----------------------------
     // Actualiza el jugador con detección de colisiones contra paredes
     // ----------------------------
     private void updatePlayerWithCollision(float delta) {
+
+        if (isPaused || isGameOver) return;
+
         // Guardar posición anterior
         float oldX = player.position.x;
         float oldY = player.position.y;
         
         // Actualizar jugador (calcula movimiento)
         player.update(delta);
-        
+
         // Si no hay movimiento, no hay colisión que verificar
         if (player.movement.isZero()) {
             return;
@@ -428,12 +516,15 @@ public class GameScreen implements Screen {
     @Override 
     public void resize(int width, int height) { 
         viewport.update(width, height, true);
+        uiStage.getViewport().update(width, height, true);
         camera.update();
     }
     
     @Override 
     public void show() { 
-        gameMusic.play(); 
+        isPaused = false;
+        isGameOver = false;
+        gameMusic.play();
     }
     
     @Override 
@@ -459,6 +550,10 @@ public class GameScreen implements Screen {
         if (renderer != null) {
             renderer.dispose();
         }
+
+        if (uiStage != null) uiStage.dispose();
+        if (pauseModal != null) pauseModal.dispose();
+        if (gameOverModal != null) gameOverModal.dispose();
         // No es necesario destruir camera o viewport, LibGDX los maneja
     }
 }
