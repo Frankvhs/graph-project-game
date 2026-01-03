@@ -533,7 +533,11 @@ public class GameScreen implements Screen {
     // ----------------------------
     private void updateEnemies(float delta) {
         for (Orc enemy : enemies) {
-            if (enemy.health.isDead()) continue;
+            // Si el enemigo está muerto, solo actualizar su animación
+            if (enemy.health.isDead()) {
+                enemy.update(delta);
+                continue;
+            }
             
             // Guardar posición anterior
             float oldX = enemy.position.x;
@@ -630,14 +634,11 @@ public class GameScreen implements Screen {
     // ----------------------------
     private void checkCombat() {
         // Verificar si el jugador golpea a enemigos
-        if (player.combat.isAttacking()) {
-            for (Orc enemy : enemies) {
-                if (enemy.health.isDead()) continue;
-                
-                float distance = player.position.dst(enemy.position);
-                if (distance <= player.combat.getAttackRange()) {
-                    enemy.takeDamage(player.combat.getDamage());
-                }
+        for (Orc enemy : enemies) {
+            if (enemy.health.isDead()) continue;
+            
+            if (player.canDamageEnemy(enemy.position)) {
+                enemy.takeDamage(player.combat.getDamage());
             }
         }
         

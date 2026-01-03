@@ -20,6 +20,20 @@ public class AnimatedEntity extends Entity {
 	public void play(String name, String basePath) {
 		play(Resources.getAnimation(name, basePath));
 	}
+	
+	/**
+	 * Fuerza el cambio de animación incluso si es la misma
+	 */
+	public void forcePlay(Animation<TextureRegion> anim) {
+		if (anim == null) return;
+		this.animation = anim;
+		this.animationState = 0f;
+		this.animationDuration = anim.getAnimationDuration();
+	}
+	public void forcePlay(String name, String basePath) {
+		Animation<TextureRegion> anim = Resources.getAnimation(name, basePath);
+		forcePlay(anim);
+	}
 
 	/**
 	 * Actualizar animación y mover la entidad segun su velocidad
@@ -35,7 +49,13 @@ public class AnimatedEntity extends Entity {
 	}
 
 	public TextureRegion getFrame() {
-		return animation.getKeyFrame(animationState, false);
+		if (animation == null) return null;
+		// Usar looping basado en el PlayMode de la animación
+		boolean looping = animation.getPlayMode() == com.badlogic.gdx.graphics.g2d.Animation.PlayMode.LOOP || 
+		                  animation.getPlayMode() == com.badlogic.gdx.graphics.g2d.Animation.PlayMode.LOOP_PINGPONG ||
+		                  animation.getPlayMode() == com.badlogic.gdx.graphics.g2d.Animation.PlayMode.LOOP_RANDOM ||
+		                  animation.getPlayMode() == com.badlogic.gdx.graphics.g2d.Animation.PlayMode.LOOP_REVERSED;
+		return animation.getKeyFrame(animationState, looping);
 	}
 	
 	public void setAnimationDuration(float animationDuration) {

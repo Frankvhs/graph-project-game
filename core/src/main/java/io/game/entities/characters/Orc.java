@@ -34,8 +34,8 @@ public class Orc extends Character {
 	public static void loadTextures() {
 		Resources.loadAnimation("idle", BASE_PATH, 100, 100, 0.1f, 35, 35, PlayMode.LOOP);
 		Resources.loadAnimation("walk", BASE_PATH, 100, 100, 0.1f, 35, 35, PlayMode.LOOP);
-		Resources.loadAnimation("hurt", BASE_PATH, 100, 100, 0.1f, 35, 35, PlayMode.LOOP);
-		Resources.loadAnimation("death", BASE_PATH, 100, 100, 0.1f, 35, 35, PlayMode.NORMAL);
+		Resources.loadAnimation("hurt", BASE_PATH, 100, 100, 0.1f, 35, 35, PlayMode.NORMAL);
+		Resources.loadAnimation("death", BASE_PATH, 100, 100, 0.15f, 35, 35, PlayMode.NORMAL);
 		Resources.loadAnimation("attack01", BASE_PATH, 100, 100, 0.1f, 35, 35, PlayMode.NORMAL);
 
 		Resources.finish();
@@ -62,7 +62,16 @@ public class Orc extends Character {
 		if (health.isDead()) {
 			movement.set(0, 0);
 			if (!this.animation.equals(Resources.getAnimation("death", BASE_PATH))) {
-				play("death", BASE_PATH);
+				forcePlay("death", BASE_PATH);
+			}
+			return;
+		}
+		
+		// Si está reproduciendo la animación de hurt, no puede moverse
+		if (this.animation.equals(Resources.getAnimation("hurt", BASE_PATH))) {
+			movement.set(0, 0);
+			if (isAnimationFinished()) {
+				play("idle", BASE_PATH);
 			}
 			return;
 		}
@@ -189,6 +198,9 @@ public class Orc extends Character {
 		if (!health.isDead()) {
 			play("hurt", BASE_PATH);
 			this.setAnimationDuration(0.3f);
+		} else {
+			// Enemigo murió, reproducir animación de muerte forzosamente
+			forcePlay("death", BASE_PATH);
 		}
 	}
 }

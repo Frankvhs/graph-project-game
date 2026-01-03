@@ -11,6 +11,7 @@ import io.game.managers.Resources;
 public class Player extends Character {
 
 	public static final String BASE_PATH = "graphics/sprites/characters/player";
+	private boolean damageApplied = false; // Control para aplicar daño solo una vez por ataque
 
 	/**
 	 * Carga inicial de animaciones (llamar una vez en el setup del juego)
@@ -31,7 +32,7 @@ public class Player extends Character {
 		size.set(100, 100);
 		position.set(0, 0);
 		maxSpeed = 400;
-		combat = new CombatComponent(100, 0.3f, 10);
+		combat = new CombatComponent(10, 0.5f, 70); // 10 daño, 0.5s cooldown, 70 rango
 		health = new HealthComponent(20);
 
 		play("idle", BASE_PATH);
@@ -73,6 +74,7 @@ public class Player extends Character {
 			if (combat.isAttacking()) {
 			    play(attack1 ? "attack01" : "attack02", BASE_PATH);
 			    this.setAnimationDuration(combat.getCooldown());
+			    damageApplied = false; // Resetear para el nuevo ataque
 			}
 		}
 
@@ -99,6 +101,28 @@ public class Player extends Character {
 	
 	public boolean wantsNextLevel() {
         return Gdx.input.isKeyJustPressed(Input.Keys.E);
+    }
+    
+    /**
+     * Verifica si el jugador puede hacer daño a un enemigo
+     */
+    public boolean canDamageEnemy(com.badlogic.gdx.math.Vector2 enemyPosition) {
+        if (damageApplied) return false;
+        if (!combat.isAttacking()) return false;
+        
+        boolean isAttack1 = this.animation.equals(Resources.getAnimation("attack01", BASE_PATH));
+        boolean isAttack2 = this.animation.equals(Resources.getAnimation("attack02", BASE_PATH));
+        if (!isAttack1 && !isAttack2) return false;
+        
+        float progress = animationState / animation.getAnimationDuration();
+        if (progress < 0.6f || progress > 0.8f) return false;
+        
+        float distance = position.dst(enemyPosition);
+        if (distance <= combat.getAttackRange()) {
+            damageApplied = true;
+            return true;
+        }
+        return false;
     }
     
     /**
