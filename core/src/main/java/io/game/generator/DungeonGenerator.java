@@ -177,6 +177,9 @@ public class DungeonGenerator {
         // ---- colocar escalera en una hoja (habitacion con 1 conexion) ----
         Room leaf = findFarthestLeaf(start);
         if (leaf != null) leaf.hasStairs = true;
+        
+        // ---- generar cofres en algunas habitaciones ----
+        generateChests(start, leaf);
 
         // ---- asegurar conectividad (BFS simple) ----
         ensureConnectivity(start);
@@ -599,6 +602,42 @@ public class DungeonGenerator {
         return dy > 0 ? Direction.N : Direction.S;
     }
 
+    // ----------------------------
+    // generateChests: coloca cofres y llaves en habitaciones aleatorias
+    // ----------------------------
+    private void generateChests(Room start, Room stairsRoom) {
+        List<Room> allRooms = new ArrayList<>(graph.getRooms());
+        // No colocar cofres en la habitación inicial ni en la que tiene escaleras
+        allRooms.remove(start);
+        if (stairsRoom != null) {
+            allRooms.remove(stairsRoom);
+        }
+        
+        // Colocar cofres en 30-50% de las habitaciones restantes
+        int numChests = Math.max(1, (int)(allRooms.size() * (0.3 + rnd.nextFloat() * 0.2)));
+        Collections.shuffle(allRooms, rnd);
+        
+        List<Room> roomsWithChests = new ArrayList<>();
+        for (int i = 0; i < Math.min(numChests, allRooms.size()); i++) {
+            allRooms.get(i).hasChest = true;
+            roomsWithChests.add(allRooms.get(i));
+        }
+        
+        // Generar llaves en habitaciones diferentes a las de los cofres
+        List<Room> roomsWithoutChests = new ArrayList<>(allRooms);
+        roomsWithoutChests.removeAll(roomsWithChests);
+        
+        if (!roomsWithoutChests.isEmpty()) {
+            // Generar una llave por cada cofre (o al menos una)
+            int numKeys = Math.max(1, numChests);
+            Collections.shuffle(roomsWithoutChests, rnd);
+            
+            for (int i = 0; i < Math.min(numKeys, roomsWithoutChests.size()); i++) {
+                roomsWithoutChests.get(i).hasKey = true;
+            }
+        }
+    }
+    
     // ----------------------------
     // findFarthestLeaf: hoja más lejana desde start (hoja = conexiones == 1)
     // ----------------------------

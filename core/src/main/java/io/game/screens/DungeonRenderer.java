@@ -12,6 +12,9 @@ public class DungeonRenderer {
     private float tileW, tileH;
     private Texture bg;
     private Texture stairsTex;
+    private Texture chestCloseTex;
+    private Texture chestOpenTex;
+    private Texture keyTex;
 
     public DungeonRenderer(float tileW, float tileH) {
         this.tileW = tileW;
@@ -19,6 +22,9 @@ public class DungeonRenderer {
         
         bg = Resources.getTexture("background", "graphics/tilesets/dungeons_tilesets");
         stairsTex = Resources.getTexture("down_stairs", "graphics/sprites/world_objects");
+        chestCloseTex = Resources.getTexture("chest_close", "graphics/sprites/world_objects");
+        chestOpenTex = Resources.getTexture("chest_open", "graphics/sprites/world_objects");
+        keyTex = Resources.getTexture("key1", "graphics/sprites/objects");
     }
 
     public void render(SpriteBatch batch, Iterable<Room> rooms) {
@@ -55,10 +61,35 @@ public class DungeonRenderer {
                 batch.setColor(Color.WHITE);
                 batch.draw(stairsTex, cx, cy, stairSize, stairSize);
             }
+            
+            // ===== 4. Dibujar cofre si lo hay =====
+            if (r.hasChest) {
+                Texture chestTex = r.chestOpened ? chestOpenTex : chestCloseTex;
+                if (chestTex != null) {
+                    // Cofre más pequeño que las escaleras y posicionado en una esquina
+                    float chestSize = tileW / 6f;
+                    float cx = px + tileW * 0.7f - chestSize * 0.5f;
+                    float cy = py + tileH * 0.7f - chestSize * 0.5f;
+                    batch.setColor(Color.WHITE);
+                    batch.draw(chestTex, cx, cy, chestSize, chestSize);
+                }
+            }
+            
+            // ===== 5. Dibujar llave si la hay y no ha sido recolectada =====
+            if (r.hasKey && !r.keyCollected && keyTex != null) {
+                float keySize = tileW / 8f;
+                float kx = px + tileW * 0.3f - keySize * 0.5f;
+                float ky = py + tileH * 0.3f - keySize * 0.5f;
+                batch.setColor(Color.WHITE);
+                batch.draw(keyTex, kx, ky, keySize, keySize);
+            }
         }
     }
     public void dispose() {
         bg = null;
-            stairsTex = null;
+        stairsTex = null;
+        chestCloseTex = null;
+        chestOpenTex = null;
+        keyTex = null;
     }
 }

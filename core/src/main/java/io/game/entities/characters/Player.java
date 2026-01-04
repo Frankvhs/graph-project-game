@@ -12,6 +12,8 @@ public class Player extends Character {
 
 	public static final String BASE_PATH = "graphics/sprites/characters/player";
 	private boolean damageApplied = false; // Control para aplicar daño solo una vez por ataque
+	private int keys = 0; // Cantidad de llaves que tiene el jugador
+	private int flasks = 0; // Cantidad de frascos de curación
 
 	/**
 	 * Carga inicial de animaciones (llamar una vez en el setup del juego)
@@ -68,6 +70,11 @@ public class Player extends Character {
 	
 		boolean attack1 = Gdx.input.isKeyJustPressed(Input.Keys.SPACE);
 		boolean attack2 = Gdx.input.isKeyJustPressed(Input.Keys.CONTROL_LEFT);
+		
+		// Usar flask con tecla Q
+		if (Gdx.input.isKeyJustPressed(Input.Keys.Q)) {
+			useFlask();
+		}
 
 		if (attack1 || attack2) {
 			combat.tryAttack();
@@ -138,6 +145,65 @@ public class Player extends Character {
     	} else {
     		play("death", BASE_PATH);
     	}
+    }
+    
+    /**
+     * Añadir una llave al inventario
+     */
+    public void addKey() {
+    	keys++;
+    }
+    
+    /**
+     * Usar una llave (al abrir un cofre)
+     */
+    public boolean useKey() {
+    	if (keys > 0) {
+    		keys--;
+    		return true;
+    	}
+    	return false;
+    }
+    
+    /**
+     * Obtener cantidad de llaves
+     */
+    public int getKeys() {
+    	return keys;
+    }
+    
+    /**
+     * Resetear llaves (al reiniciar nivel)
+     */
+    public void resetKeys() {
+    	keys = 0;
+    }
+    
+    /**
+     * Añadir un frasco de curación al inventario
+     */
+    public void addFlask() {
+    	flasks++;
+    }
+    
+    /**
+     * Usar un frasco de curación (cura 5 puntos)
+     */
+    public boolean useFlask() {
+    	if (flasks > 0 && !health.isDead() && health.getHealth() < health.getMaxHealth()) {
+    		flasks--;
+    		health.heal(5);
+    		System.out.println("¡Flask usado! Vida: " + health.getHealth() + "/" + health.getMaxHealth() + " - Flasks restantes: " + flasks);
+    		return true;
+    	}
+    	return false;
+    }
+    
+    /**
+     * Obtener cantidad de frascos
+     */
+    public int getFlasks() {
+    	return flasks;
     }
 
 }

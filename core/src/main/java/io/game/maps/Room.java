@@ -17,6 +17,10 @@ public class Room {
 
     public boolean isStart = false;
     public boolean hasStairs = false;
+    public boolean hasChest = false;
+    public boolean chestOpened = false;
+    public boolean hasKey = false;
+    public boolean keyCollected = false;
     public boolean discovered = false;
 
     private EnumMap<Direction, Boolean> connected = new EnumMap<>(Direction.class);

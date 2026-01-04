@@ -51,6 +51,7 @@ public class GameScreen implements Screen {
     private GameMain game;
     private HealthBar healthBar;
     private GameOverScreen gameOverScreen;
+    private com.badlogic.gdx.graphics.g2d.BitmapFont uiFont;
 
     public GameScreen(GameMain game) {
         this.game = game;
@@ -77,6 +78,10 @@ public class GameScreen implements Screen {
         // Load dungeon textures
         Resources.loadTexture("background", "graphics/tilesets/dungeons_tilesets");
         Resources.loadTexture("down_stairs", "graphics/sprites/world_objects");
+        Resources.loadTexture("chest_close", "graphics/sprites/world_objects");
+        Resources.loadTexture("chest_open", "graphics/sprites/world_objects");
+        Resources.loadTexture("key1", "graphics/sprites/objects");
+        Resources.loadTexture("flasks_1_1", "graphics/sprites/objects");
         Resources.finish();
 
         renderer = new DungeonRenderer(tileW, tileH);
@@ -116,6 +121,11 @@ public class GameScreen implements Screen {
             () -> { regenerate(1); }, // Reiniciar en nivel 1
             () -> { Gdx.app.exit(); } // Salir del juego
         );
+        
+        // Crear fuente para UI
+        uiFont = new com.badlogic.gdx.graphics.g2d.BitmapFont();
+        uiFont.getData().setScale(2.0f);
+        uiFont.setColor(Color.WHITE);
     }
 
     private void regenerate(int newLevel) {
@@ -132,6 +142,9 @@ public class GameScreen implements Screen {
         
         // Restaurar la salud del jugador al reiniciar
         player.health.heal(player.health.getMaxHealth());
+        
+        // Resetear llaves al cambiar de nivel
+        player.resetKeys();
         
         // Ocultar game over si está visible
         if (gameOverScreen != null && gameOverScreen.isVisible()) {
@@ -190,13 +203,36 @@ public class GameScreen implements Screen {
 
             // check if player stands over a room with stairs and pressed E
             Room current = getRoomAtPlayer();
-            if (current != null && current.hasStairs && player.wantsNextLevel()) {
-                if (level >= MAX_DUNGEONS) {
-                    gameOverScreen.show();
-                } else {
-                    regenerate(level + 1);
+            if (current != null && player.wantsNextLevel()) {
+                // Verificar si hay una llave en la habitación
+                if (current.hasKey && !current.keyCollected) {
+                    current.keyCollected = true;
+                    player.addKey();
+                    System.out.println("¡Llave recogida! Total: " + player.getKeys());
                 }
-                return; // skip one frame to avoid input repeat
+                // Verificar si hay un cofre cerrado en la habitación
+                else if (current.hasChest && !current.chestOpened) {
+                    if (player.useKey()) {
+                        current.chestOpened = true;
+                        // Dar frascos al abrir el cofre (1-3 frascos aleatorios)
+                        int flasksFound = 1 + (int)(Math.random() * 3);
+                        for (int i = 0; i < flasksFound; i++) {
+                            player.addFlask();
+                        }
+                        System.out.println("¡Cofre abierto! Encontraste " + flasksFound + " flask(s). Total: " + player.getFlasks() + " - Llaves restantes: " + player.getKeys());
+                    } else {
+                        System.out.println("¡Necesitas una llave para abrir el cofre!");
+                    }
+                }
+                // Verificar escaleras
+                else if (current.hasStairs) {
+                    if (level >= MAX_DUNGEONS) {
+                        gameOverScreen.show();
+                    } else {
+                        regenerate(level + 1);
+                    }
+                    return; // skip one frame to avoid input repeat
+                }
             }
         }
 
@@ -217,6 +253,9 @@ public class GameScreen implements Screen {
         // Renderizar UI (barra de vida) usando la cámara de UI
         batch.setProjectionMatrix(pauseMenu.getStage().getCamera().combined);
         healthBar.render(batch, player.health, 20);
+        
+        // Renderizar contadores de llaves y frascos
+        renderInventoryUI(batch);
         
         batch.end();
         
@@ -498,6 +537,33 @@ public class GameScreen implements Screen {
     }
     
     // ----------------------------
+    // Renderiza el inventario del jugador (llaves y frascos)
+    // ----------------------------
+    private void renderInventoryUI(SpriteBatch batch) {
+        // Renderizar icono y contador de llaves
+        com.badlogic.gdx.graphics.Texture keyTex = Resources.getTexture("key1", "graphics/sprites/objects");
+        if (keyTex != null) {
+            float iconSize = 40;
+            float keyX = 20;
+            float keyY = Gdx.graphics.getHeight() - 140;
+            batch.setColor(Color.WHITE);
+            batch.draw(keyTex, keyX, keyY, iconSize, iconSize);
+            uiFont.draw(batch, "x" + player.getKeys(), keyX + iconSize + 10, keyY + iconSize * 0.7f);
+        }
+        
+        // Renderizar icono y contador de frascos
+        com.badlogic.gdx.graphics.Texture flaskTex = Resources.getTexture("flasks_1_1", "graphics/sprites/objects");
+        if (flaskTex != null) {
+            float iconSize = 40;
+            float flaskX = 20;
+            float flaskY = Gdx.graphics.getHeight() - 200;
+            batch.setColor(Color.WHITE);
+            batch.draw(flaskTex, flaskX, flaskY, iconSize, iconSize);
+            uiFont.draw(batch, "x" + player.getFlasks() + " (Q)", flaskX + iconSize + 10, flaskY + iconSize * 0.7f);
+        }
+    }
+    
+    // ----------------------------
     // Genera enemigos aleatoriamente en las habitaciones (excepto la inicial)
     // ----------------------------
     private void generateEnemies() {
@@ -675,6 +741,7 @@ public class GameScreen implements Screen {
         if (renderer != null) renderer.dispose();
         if (pauseMenu != null) pauseMenu.dispose();
         if (gameOverScreen != null) gameOverScreen.dispose();
+        if (uiFont != null) uiFont.dispose();
         if (viewport != null) viewport = null;
         if (camera != null) camera = null;
     }
