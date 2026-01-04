@@ -29,6 +29,8 @@ import java.util.List;
 
 public class GameScreen implements Screen {
 
+    private static final int MAX_DUNGEONS = 5;
+
     private SpriteBatch batch;
     private Player player;
     private List<Orc> enemies;
@@ -189,7 +191,11 @@ public class GameScreen implements Screen {
             // check if player stands over a room with stairs and pressed E
             Room current = getRoomAtPlayer();
             if (current != null && current.hasStairs && player.wantsNextLevel()) {
-                regenerate(level + 1);
+                if (level >= MAX_DUNGEONS) {
+                    gameOverScreen.show();
+                } else {
+                    regenerate(level + 1);
+                }
                 return; // skip one frame to avoid input repeat
             }
         }
