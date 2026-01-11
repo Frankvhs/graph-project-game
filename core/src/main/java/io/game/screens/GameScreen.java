@@ -428,6 +428,26 @@ public class GameScreen implements Screen {
                     return true;
                 }
             }
+            
+            // COLISIÓN CON COFRE (si existe en la habitación)
+            if (room.hasChest) {
+                float chestSize = tileW / 6f;
+                float chestX = rx + tileW * 0.7f - chestSize * 0.5f;
+                float chestY = ry + tileH * 0.7f - chestSize * 0.5f;
+                
+                // Hitbox del cofre (ligeramente más pequeño para mejor jugabilidad)
+                float chestHitboxSize = chestSize * 0.7f;
+                float chestCenterX = chestX + chestSize * 0.5f;
+                float chestCenterY = chestY + chestSize * 0.5f;
+                float cx1 = chestCenterX - chestHitboxSize * 0.5f;
+                float cy1 = chestCenterY - chestHitboxSize * 0.5f;
+                float cx2 = chestCenterX + chestHitboxSize * 0.5f;
+                float cy2 = chestCenterY + chestHitboxSize * 0.5f;
+                
+                if (intersects(px1, py1, px2, py2, cx1, cy1, cx2, cy2)) {
+                    return true;
+                }
+            }
         }
         
         return false;
@@ -497,6 +517,23 @@ public class GameScreen implements Screen {
                 float wallInnerX = rx + wallThickness;
                 shapeRenderer.rect(rx, ry, wallThickness, centerY - doorHalfWidth - ry);
                 shapeRenderer.rect(rx, centerY + doorHalfWidth, wallThickness, ry + tileH - (centerY + doorHalfWidth));
+            }
+            
+            // Dibujar hitbox del cofre si existe
+            if (room.hasChest) {
+                shapeRenderer.setColor(Color.YELLOW);
+                float chestSize = tileW / 6f;
+                float chestX = rx + tileW * 0.7f - chestSize * 0.5f;
+                float chestY = ry + tileH * 0.7f - chestSize * 0.5f;
+                
+                float chestHitboxSize = chestSize * 0.7f;
+                float chestCenterX = chestX + chestSize * 0.5f;
+                float chestCenterY = chestY + chestSize * 0.5f;
+                float cx1 = chestCenterX - chestHitboxSize * 0.5f;
+                float cy1 = chestCenterY - chestHitboxSize * 0.5f;
+                
+                shapeRenderer.rect(cx1, cy1, chestHitboxSize, chestHitboxSize);
+                shapeRenderer.setColor(Color.RED); // restaurar color
             }
         }
         
