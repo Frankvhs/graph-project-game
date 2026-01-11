@@ -443,45 +443,6 @@ public class DungeonGenerator {
             removeDoorFromRoom(slot.room, slot.dir);
         }
     }
-    
-    // ----------------------------
-    // validateAndFixAllRooms: elimina puertas no conectadas de todas las habitaciones
-    // ----------------------------
-    private void validateAndFixAllRooms() {
-        for (Room room : graph.getRooms()) {
-            Set<Direction> connectedDoors = EnumSet.noneOf(Direction.class);
-            
-            // recopilar solo las puertas que están realmente conectadas
-            for (Direction d : Direction.values()) {
-                if (room.isConnected(d)) {
-                    connectedDoors.add(d);
-                }
-            }
-            
-            // SIEMPRE actualizar el template para que coincida exactamente con las conexiones
-            Set<Direction> templateDoors = room.getTemplate().getDoors();
-            
-            if (!templateDoors.equals(connectedDoors)) {
-                if (connectedDoors.isEmpty()) {
-                    // Si no hay conexiones, algo salió mal - mantener al menos una puerta
-                    System.err.println("WARNING: Room at (" + room.x + "," + room.y + ") has no connections!");
-                    // Buscar si tiene alguna puerta en el template y mantenerla
-                    if (!templateDoors.isEmpty()) {
-                        connectedDoors.add(templateDoors.iterator().next());
-                    }
-                }
-                
-                if (!connectedDoors.isEmpty()) {
-                    RoomTemplate newTpl = findTemplateWithDoors(connectedDoors);
-                    if (newTpl != null) {
-                        room.setTemplate(newTpl);
-                    } else {
-                        System.err.println("ERROR: Could not find template for doors: " + connectedDoors);
-                    }
-                }
-            }
-        }
-    }
 
     // ----------------------------
     // Añade la puerta 'dir' a 'target' modificando su template

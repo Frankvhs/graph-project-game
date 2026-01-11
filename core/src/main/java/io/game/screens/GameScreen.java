@@ -48,13 +48,11 @@ public class GameScreen implements Screen {
 
     private Music gameMusic;
     private PauseMenu pauseMenu;
-    private GameMain game;
     private HealthBar healthBar;
     private GameOverScreen gameOverScreen;
     private com.badlogic.gdx.graphics.g2d.BitmapFont uiFont;
 
     public GameScreen(GameMain game) {
-        this.game = game;
         this.batch = game.batch;
 
         Player.loadTextures();
@@ -108,7 +106,7 @@ public class GameScreen implements Screen {
         pauseMenu = new PauseMenu(
             batch,
             () -> { /* Continuar juego */ },
-            () -> { game.setScreen(game.menuScreen); },
+            () -> { Gdx.app.exit(); }, // TODO: Implementar volver al menú principal
             () -> { Gdx.app.exit(); }
         );
         
