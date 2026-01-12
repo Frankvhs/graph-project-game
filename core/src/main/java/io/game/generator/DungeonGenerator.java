@@ -10,7 +10,6 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Generador adaptado a tu especificación:
  * - objetivo mínimo de habitaciones: 6 + (level-1)
  * - generación expansiva desde una start room
  * - al final, puertas "sueltas" se cierran: primero intentando colocar
