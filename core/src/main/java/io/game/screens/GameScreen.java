@@ -118,7 +118,7 @@ public class GameScreen implements Screen {
         // Crear pantalla de game over
         gameOverScreen = new GameOverScreen(
             batch,
-            () -> { regenerate(1); }, // Reiniciar en nivel 1
+            () -> { restart(); }, // Reiniciar en nivel 1 con vida completa
             () -> { Gdx.app.exit(); } // Salir del juego
         );
         
@@ -140,9 +140,6 @@ public class GameScreen implements Screen {
         player.position.set(0f + tileW * 0.5f, 0f + tileH * 0.5f);
         player.movement.set(0f, 0f);
         
-        // Restaurar la salud del jugador al reiniciar
-        player.health.heal(player.health.getMaxHealth());
-        
         // Resetear llaves al cambiar de nivel
         player.resetKeys();
         
@@ -163,6 +160,8 @@ public class GameScreen implements Screen {
      * Método público para reiniciar el juego desde el nivel 1
      */
     public void restart() {
+        // Restaurar la vida completa al reiniciar desde game over
+        player.health.heal(player.health.getMaxHealth());
         regenerate(1);
     }
 

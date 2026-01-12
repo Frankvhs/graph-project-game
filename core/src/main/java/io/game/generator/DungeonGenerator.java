@@ -182,7 +182,7 @@ public class DungeonGenerator {
 
         // ---- asegurar conectividad (BFS simple) ----
         ensureConnectivity(start);
-
+        
         return new ArrayList<>(graph.getRooms());
     }
 
